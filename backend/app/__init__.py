@@ -1,0 +1,1 @@
+"""CampusConnect FastAPI backend package."""
