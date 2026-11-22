@@ -4,6 +4,11 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
+
+from app.auth.passwords import verify_password
+from app.database import get_db
+from app.main import app
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import URL, create_engine, inspect, text
@@ -187,3 +192,85 @@ def test_postgresql_rejects_noncanonical_direct_values(migrated_engine, field, v
                 values,
             )
         assert error.value.orig.diag.constraint_name == constraint
+
+
+@pytest.fixture
+def registration_client(migrated_engine):
+    """Route requests to the disposable PostgreSQL database; clean up committed rows."""
+    def isolated_session():
+        with Session(migrated_engine) as session:
+            yield session
+
+    previous = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = isolated_session
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous
+        with migrated_engine.begin() as connection:
+            connection.execute(text("DELETE FROM users"))
+
+
+def registration_body(**changes):
+    return {
+        "full_name": "  Example Student  ",
+        "email": " Student@Example.EDU ",
+        "university_id": " ab-123 ",
+        "password": "StrongPassphrase#123",
+        "confirm_password": "StrongPassphrase#123",
+        **changes,
+    }
+
+
+def test_registration_creates_only_student_without_returning_secrets(registration_client, migrated_engine):
+    response = registration_client.post("/api/v1/auth/register", json=registration_body())
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["email"] == "student@example.edu"
+    assert body["university_id"] == "AB-123"
+    assert body["full_name"] == "Example Student"
+    assert body["account_type"] == "student"
+    assert body["is_active"] is True
+    assert "password" not in response.text.lower()
+    assert "hash" not in response.text.lower()
+    with Session(migrated_engine) as session:
+        stored = session.query(User).filter_by(email="student@example.edu").one()
+        assert stored.account_type is AccountType.STUDENT
+        assert stored.password_hash != "StrongPassphrase#123"
+        assert verify_password("StrongPassphrase#123", stored.password_hash)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"email": "student@example.edu", "university_id": "SECOND-ID"},
+        {"email": "another@example.edu", "university_id": "AB-123"},
+    ],
+)
+def test_registration_rejects_duplicates_atomically(registration_client, changes):
+    assert registration_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    duplicate = registration_client.post("/api/v1/auth/register", json=registration_body(**changes))
+    assert duplicate.status_code == 409
+    assert duplicate.json() == {"detail": "An account with these details already exists"}
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"confirm_password": "MismatchSecret#456"},
+        {"account_type": "student_affairs"},
+        {"password": "short", "confirm_password": "short"},
+        {"email": "invalid-email"},
+    ],
+)
+def test_registration_errors_do_not_echo_submitted_secrets(registration_client, changes):
+    payload = registration_body(**changes)
+    response = registration_client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 422, response.text
+    assert "StrongPassphrase#123" not in response.text
+    assert "MismatchSecret#456" not in response.text
+    assert all("input" not in error for error in response.json()["detail"])

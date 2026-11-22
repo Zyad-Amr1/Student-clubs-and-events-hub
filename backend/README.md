@@ -181,3 +181,41 @@ it created, and checks that ORM metadata matches the migration.
 $env:CAMPUSCONNECT_AUTH_TEST_PG_PORT = '55483'
 .\.venv\Scripts\python.exe -m pytest -q
 ```
+
+## Student registration API
+
+POST /api/v1/auth/register creates a Student account, returning HTTP 201.
+Required JSON fields: full_name, email, university_id, password, confirm_password.
+Email is validated and case-folded; university ID is trimmed and uppercased.
+Names are trimmed. Passwords must be 8–128 characters and must match.
+Extra fields, including account_type and is_active, are rejected (HTTP 422).
+Student Affairs registration is not public.
+
+Example request body:
+
+```json
+{
+  "full_name": "Example Student",
+  "email": "student@example.edu",
+  "university_id": "23P0000",
+  "password": "ExamplePassphrase#123",
+  "confirm_password": "ExamplePassphrase#123"
+}
+```
+
+HTTP 201 returns id, full_name, normalized email and university_id,
+account_type (`student`), is_active and created_at. No password, password
+confirmation or password hash is returned. Duplicate identifiers return
+HTTP 409 with a generic conflict message; invalid fields return HTTP 422
+without echoing submitted input (including passwords).
+
+Password hashes use the Python standard-library scrypt implementation with
+a unique random salt and memory-hard work factors (N=131072, r=8, p=1).
+This avoids introducing optional third-party compiled cryptography extensions
+on Windows. The stored hash encodes its scheme and work factors for later
+verification. Hashing is performed before insert; uniqueness is enforced
+by PostgreSQL constraints to avoid check-then-insert races.
+
+Registration does **not** yet issue a JWT or sign the Student in. The
+immediate sign-in acceptance criterion in CAMP-46 remains pending on the
+Login/JWT phase; Flutter must not assume a token is returned from this endpoint.
