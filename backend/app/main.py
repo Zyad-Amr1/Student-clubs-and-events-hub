@@ -19,7 +19,7 @@ app.include_router(auth_router)
 @app.exception_handler(RequestValidationError)
 async def sanitize_registration_validation(request: Request, exc: RequestValidationError):
     """Do not echo submitted passwords in FastAPI's 422 validation payload."""
-    if request.url.path != "/api/v1/auth/register":
+    if request.url.path not in {"/api/v1/auth/register", "/api/v1/auth/login"}:
         return await request_validation_exception_handler(request, exc)
     errors = [
         {key: error[key] for key in ("type", "loc", "msg") if key in error}

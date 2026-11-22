@@ -219,3 +219,50 @@ by PostgreSQL constraints to avoid check-then-insert races.
 Registration does **not** yet issue a JWT or sign the Student in. The
 immediate sign-in acceptance criterion in CAMP-46 remains pending on the
 Login/JWT phase; Flutter must not assume a token is returned from this endpoint.
+
+## Login, JWT sessions and logout (CAMP-60)
+
+The API provides the following routes after applying revision `0002_create_auth_sessions`:
+
+- `POST /api/v1/auth/login` accepts `{"email": "...", "password": "..."}`.
+  On success, responds with `{"access_token": "...", "token_type": "bearer", "expires_in": 3600}`.
+  Invalid/disabled/nonexistent credentials all get the same HTTP 401 response.
+- `GET /api/v1/auth/me` requires `Authorization: Bearer <access_token>` and
+  returns the server-authorized account profile (including `account_type`).
+- `POST /api/v1/auth/logout` requires the same header and returns HTTP 204;
+  its server-side session is immediately revoked (future use of that JWT returns 401).
+
+Signed JWTs use **HS256**, a 60-minute lifetime, a validated issuer/audience,
+and required `sub`/`jti`/`iat`/`exp` claims. The token contains no email,
+password, or client-supplied role. Each request checks the database session's
+revocation and expiry state and the user's `is_active` status. Logout revokes
+only the current device session, not other devices. Expired rows may be pruned
+later as maintenance; never treat client-side token deletion as server revocation.
+
+`JWT_SECRET_KEY` is required **only for JWT endpoints**. Generate a high-entropy
+secret on the developer's machine and place it in ignored `backend/.env`.
+For example, from the backend folder:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Copy that value into a local `JWT_SECRET_KEY=...` setting without sharing it.
+The setting must be at least 32 UTF-8 bytes. Missing/short secrets cause
+HTTP 503 on JWT endpoints rather than silently using a development key.
+Use HTTPS outside localhost; do not print/store JWTs in app logs. In Flutter,
+persist tokens only in platform secure storage, clear them on logout, and
+clear/re-authenticate on 401. There is **no refresh-token endpoint yet**;
+users must log in again after token expiry. Student Affairs accounts, when
+provisioned through controlled administration, use the same login endpoint.
+
+For a registration-to-home flow on Flutter: first call registration, then
+immediately call login with the same credentials, store the returned JWT in
+secure storage and call `/me` for backend-authorized routing. No client-side
+UI mode selection can create privileges.
+
+The second Alembic migration creates `auth_sessions` with a UUID token ID
+(JWT `jti`), user foreign key, expiry, revocation and creation timestamps.
+It is **not** applied automatically when the server starts. Review and migrate
+the intended local PostgreSQL database separately. Local registration remains
+available without a JWT secret, but login requires the second migration.
