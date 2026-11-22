@@ -113,7 +113,8 @@ readiness route uses a short-lived connection from the same engine.
 ## Migrations
 
 Alembic uses the same database URL and SQLAlchemy metadata as the application.
-There are no schema revisions in this phase. API startup does not execute Alembic.
+The first revision, `0001_create_users`, creates the `users` table. API startup
+does not execute Alembic.
 
 List repository revisions or preview SQL without connecting to PostgreSQL:
 
@@ -122,18 +123,41 @@ List repository revisions or preview SQL without connecting to PostgreSQL:
 .\.venv\Scripts\python.exe -m alembic upgrade head --sql
 ```
 
-Once models and reviewed revisions exist, use these commands from `backend`
-with `DATABASE_URL` set to the intended database:
+After approval to apply the revision, use these commands from `backend` with
+`DATABASE_URL` set to the intended database.
 
 ```powershell
 .\.venv\Scripts\python.exe -m alembic current
-.\.venv\Scripts\python.exe -m alembic revision --autogenerate -m "Describe the schema change"
 .\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Import new model modules in the Alembic environment before autogenerating so
-their tables are registered in the shared metadata. Review generated revisions
-before applying them.
+For future revisions, import new model modules in the Alembic environment before
+using `alembic revision --autogenerate -m "Describe the schema change"`, then
+review the generated migration. Downgrading this initial revision drops the
+`users` table and its data.
+
+## User accounts
+
+PostgreSQL generates the UUID primary key. Full name, email, university ID, and
+password hash are required. Email is trimmed and Unicode case-folded. University ID is
+trimmed and uppercased. PostgreSQL 18 with UTF-8 uses its built-in
+`pg_unicode_fast` collation for these identifiers. Both identifiers have independent unique constraints
+backed by indexes, and the database rejects attempts to change them after
+insertion. The password hash column is for encoded hashes. The future credential
+service must hash passwords before persisting them.
+
+New users default to active Student accounts. The database accepts only
+`student` and `student_affairs` as account types. Future public registration
+must always create Students and must not expose an account-type selector.
+Student Affairs accounts require a controlled administrative provisioning
+process. Future club administrator permissions will be assigned per approved
+club and will not be a global account type.
+
+Faculty, department, academic year, and profile picture URL are optional.
+Academic year must be positive when provided. These fields and full name can
+be edited later. Profile editing will validate that a department belongs to
+the selected faculty. PostgreSQL stores creation and update timestamps as
+timezone-aware instants and refreshes the update timestamp on row changes.
 
 ## Tests
 
@@ -141,5 +165,19 @@ before applying them.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Tests use mocked database connections and run without PostgreSQL credentials or
-a running database.
+GitHub Actions runs the full suite on Python 3.12 with an ephemeral PostgreSQL 18
+service. Missing database configuration fails the integration tests in Actions.
+Locally, the suite skips the PostgreSQL tests unless
+`CAMPUSCONNECT_AUTH_TEST_PG_PORT` is set.
+
+To run those tests, use a separate disposable PostgreSQL instance listening on
+loopback on a port other than 5432. Create an empty database named
+`campusconnect_auth_test` accessible locally as `postgres` without a password
+on that instance. The suite uses only that loopback instance and database name.
+It upgrades and downgrades the test schema, removes the migration tracking table
+it created, and checks that ORM metadata matches the migration.
+
+```powershell
+$env:CAMPUSCONNECT_AUTH_TEST_PG_PORT = '55483'
+.\.venv\Scripts\python.exe -m pytest -q
+```

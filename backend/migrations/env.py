@@ -5,12 +5,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
 from app.config import DatabaseConfigurationError, get_database_url
-from app.database import Base
+from app.models.user import User
 
 
 def run_migrations() -> None:
+    # User.metadata is the shared Base metadata, with the users table registered.
+    target_metadata = User.metadata
     if context.is_offline_mode():
-        context.configure(dialect_name="postgresql", target_metadata=Base.metadata)
+        context.configure(dialect_name="postgresql", target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
         return
@@ -23,7 +25,7 @@ def run_migrations() -> None:
     )
     try:
         with engine.connect() as connection:
-            context.configure(connection=connection, target_metadata=Base.metadata)
+            context.configure(connection=connection, target_metadata=target_metadata)
             with context.begin_transaction():
                 context.run_migrations()
     finally:
