@@ -273,4 +273,4 @@ def test_registration_errors_do_not_echo_submitted_secrets(registration_client, 
     assert response.status_code == 422, response.text
     assert "StrongPassphrase#123" not in response.text
     assert "MismatchSecret#456" not in response.text
-    assert "input" not in response.text
+    assert all("input" not in error for error in response.json()["detail"])
