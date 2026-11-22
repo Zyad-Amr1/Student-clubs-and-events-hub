@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
-class StudentRegistrationRequest(BaseModel):
+class AccountCreationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     full_name: str = Field(min_length=2, max_length=120)
@@ -42,10 +42,14 @@ class StudentRegistrationRequest(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_confirmation(self) -> "StudentRegistrationRequest":
+    def validate_confirmation(self) -> "AccountCreationInput":
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match")
         return self
+
+
+class StudentRegistrationRequest(AccountCreationInput):
+    """Public registration accepts identity and password fields only."""
 
 
 class RegisteredStudent(BaseModel):

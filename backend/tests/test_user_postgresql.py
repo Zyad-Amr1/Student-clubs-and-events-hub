@@ -7,8 +7,11 @@ import pytest
 import jwt
 from fastapi.testclient import TestClient
 
+from app.auth.accounts import DuplicateAccountError, create_account
 from app.auth.passwords import hash_password, verify_password
+from app.auth.schemas import AccountCreationInput
 from app.auth.tokens import JWT_AUDIENCE, JWT_ISSUER
+from app.config import get_jwt_secret
 from app.database import get_db
 from app.main import app
 from alembic import command
@@ -427,3 +430,86 @@ def test_login_invalid_payload_never_echoes_credentials(auth_client):
     assert response.status_code == 422
     assert secret not in response.text
     assert all("input" not in error for error in response.json()["detail"])
+
+
+_AFFAIRS_PATH = "/api/v1/auth/student-affairs"
+
+
+@pytest.mark.parametrize("authorization", [None, "Bearer invalid"])
+def test_student_affairs_requires_valid_authentication(auth_client, authorization):
+    headers = {"Authorization": authorization} if authorization else {}
+    response = auth_client.get(_AFFAIRS_PATH, headers=headers)
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_student_role_cannot_be_overridden_by_client(auth_client):
+    assert auth_client.post(
+        "/api/v1/auth/register", json=registration_body(account_type="student_affairs")
+    ).status_code == 422
+    assert auth_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    response = auth_client.post("/api/v1/auth/login", json=login_body())
+    assert response.status_code == 200
+    headers = {**access_headers(response.json()["access_token"]), "X-Role": "student_affairs"}
+    denied = auth_client.get(_AFFAIRS_PATH, headers=headers, params={"account_type": "student_affairs"})
+    assert denied.status_code == 403
+    claims = jwt.decode(response.json()["access_token"], options={"verify_signature": False})
+    claims["account_type"] = "student_affairs"
+    token_with_role = jwt.encode(claims, get_jwt_secret(), algorithm="HS256")
+    assert auth_client.get(_AFFAIRS_PATH, headers=access_headers(token_with_role)).status_code == 403
+
+
+def test_student_affairs_role_uses_current_db_account_and_rejects_expired_revoked_tokens(
+    auth_client, migrated_engine
+):
+    with Session(migrated_engine) as session:
+        user = User(
+            full_name="Synthetic Affairs Officer",
+            email="affairs@example.edu",
+            university_id="OFFICE-01",
+            password_hash=hash_password("SyntheticAffairsPassword123!"),
+            account_type=AccountType.STUDENT_AFFAIRS,
+        )
+        session.add(user)
+        session.commit()
+        user_id = user.id
+
+    response = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "affairs@example.edu", "password": "SyntheticAffairsPassword123!"},
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    headers = access_headers(token)
+    allowed = auth_client.get(_AFFAIRS_PATH, headers=headers)
+    assert allowed.status_code == 200
+    assert allowed.json() == {"account_type": "student_affairs"}
+
+    claims = jwt.decode(token, options={"verify_signature": False})
+    claims["exp"] = int((datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp())
+    expired = jwt.encode(claims, get_jwt_secret(), algorithm="HS256")
+    assert auth_client.get(_AFFAIRS_PATH, headers=access_headers(expired)).status_code == 401
+
+    with Session(migrated_engine) as session:
+        session.get(User, user_id).account_type = AccountType.STUDENT
+        session.commit()
+    assert auth_client.get(_AFFAIRS_PATH, headers=headers).status_code == 403
+    assert auth_client.post("/api/v1/auth/logout", headers=headers).status_code == 204
+    assert auth_client.get(_AFFAIRS_PATH, headers=headers).status_code == 401
+
+
+@pytest.mark.parametrize("changes", [
+    {"email": " STUDENT@EXAMPLE.EDU ", "university_id": "DIFFERENT-ID"},
+    {"email": "officer@example.edu", "university_id": " ab-123 "},
+])
+def test_affairs_provisioning_rejects_duplicates_without_promoting(
+    registration_client, migrated_engine, changes
+):
+    assert registration_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    data = AccountCreationInput.model_validate(registration_body(**changes))
+    with Session(migrated_engine) as session:
+        with pytest.raises(DuplicateAccountError):
+            create_account(session, data, AccountType.STUDENT_AFFAIRS)
+        users = session.query(User).all()
+        assert len(users) == 1
+        assert users[0].account_type is AccountType.STUDENT

@@ -1,13 +1,14 @@
-"""Public student registration, with no privilege or password fields in responses."""
+"""Public registration and login, authenticated profiles, and account-type checks."""
 
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AuthenticatedIdentity, current_identity
+from app.auth.accounts import DuplicateAccountError, create_account
+from app.auth.dependencies import AuthenticatedIdentity, current_identity, require_roles
 from app.auth.passwords import hash_password, verify_password
 from app.auth.tokens import ACCESS_TOKEN_TTL, issue_token, utcnow
 from app.config import AuthenticationConfigurationError
@@ -21,8 +22,6 @@ from app.models.user import AccountType, User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
-_UNIQUE_USER_CONSTRAINTS = {"uq_users_email", "uq_users_university_id"}
-
 
 @router.post(
     "/register",
@@ -35,25 +34,13 @@ def register_student(
     db: Session = Depends(get_db),
 ) -> User:
     """Create a Student. Unique constraints enforce duplicates atomically."""
-    user = User(
-        full_name=data.full_name,
-        email=data.email,
-        university_id=data.university_id,
-        password_hash=hash_password(data.password),
-        account_type=AccountType.STUDENT,
-    )
-    db.add(user)
     try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
-        if constraint in _UNIQUE_USER_CONSTRAINTS:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="An account with these details already exists",
-            ) from None
-        raise
+        user = create_account(db, data, AccountType.STUDENT)
+    except DuplicateAccountError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with these details already exists",
+        ) from None
 
     db.refresh(user)
     return user
@@ -99,6 +86,19 @@ def login(data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
 def authenticated_me(identity: AuthenticatedIdentity = Depends(current_identity)) -> User:
     """Return only a safe profile after validating the session on the server."""
     return identity.user
+
+
+@router.get(
+    "/student-affairs",
+    dependencies=[Depends(require_roles(AccountType.STUDENT_AFFAIRS))],
+    responses={
+        401: {"description": "Invalid or expired session"},
+        403: {"description": "Insufficient permissions"},
+    },
+)
+def student_affairs_access() -> dict[str, Literal["student_affairs"]]:
+    """Confirm that the authenticated account has Student Affairs access."""
+    return {"account_type": "student_affairs"}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
