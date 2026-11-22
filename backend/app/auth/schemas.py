@@ -58,3 +58,33 @@ class RegisteredStudent(BaseModel):
     account_type: Literal["student"]
     is_active: bool
     created_at: datetime
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_login_email(cls, value: str) -> str:
+        return value.strip().casefold()
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+
+class AuthenticatedUser(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    full_name: str
+    email: str
+    university_id: str
+    account_type: Literal["student", "student_affairs"]
+    is_active: bool
+    created_at: datetime

@@ -1,12 +1,14 @@
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
+import jwt
 from fastapi.testclient import TestClient
 
-from app.auth.passwords import verify_password
+from app.auth.passwords import hash_password, verify_password
+from app.auth.tokens import JWT_AUDIENCE, JWT_ISSUER
 from app.database import get_db
 from app.main import app
 from alembic import command
@@ -273,4 +275,155 @@ def test_registration_errors_do_not_echo_submitted_secrets(registration_client, 
     assert response.status_code == 422, response.text
     assert "StrongPassphrase#123" not in response.text
     assert "MismatchSecret#456" not in response.text
+    assert all("input" not in error for error in response.json()["detail"])
+
+
+# Login, JWT authorization, and server-side logout integration tests.
+# These always run on the disposable PostgreSQL test instance from migrated_engine.
+
+@pytest.fixture
+def auth_client(registration_client, monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "only-for-tests-0123456789-abcdefghijklmnopqrstuv")
+    return registration_client
+
+
+def login_body(**changes):
+    return {"email": " STUDENT@EXAMPLE.EDU ", "password": "StrongPassphrase#123", **changes}
+
+
+def access_headers(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_login_me_and_logout_revoke_session(auth_client, migrated_engine):
+    assert auth_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    response = auth_client.post("/api/v1/auth/login", json=login_body())
+    assert response.status_code == 200, response.text
+    tokens = response.json()
+    assert tokens["token_type"] == "bearer"
+    assert tokens["expires_in"] == 3600
+    access_token = tokens["access_token"]
+    assert access_token.count(".") == 2
+    assert "StrongPassphrase#123" not in response.text
+
+    profile = auth_client.get("/api/v1/auth/me", headers=access_headers(access_token))
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["email"] == "student@example.edu"
+    assert profile.json()["account_type"] == "student"
+    assert "password" not in profile.text.lower()
+
+    outcome = auth_client.post("/api/v1/auth/logout", headers=access_headers(access_token))
+    assert outcome.status_code == 204
+    assert outcome.content == b""
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(access_token)).status_code == 401
+    with Session(migrated_engine) as session:
+        assert session.query(User).count() == 1
+
+
+def test_login_invalid_or_unknown_email_same_response(auth_client):
+    assert auth_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    wrong = auth_client.post("/api/v1/auth/login", json=login_body(password="wrong password"))
+    unknown = auth_client.post(
+        "/api/v1/auth/login", json=login_body(email="unknown@example.edu")
+    )
+    assert wrong.status_code == unknown.status_code == 401
+    assert wrong.json() == unknown.json() == {"detail": "Invalid email or password"}
+
+
+def test_disabled_account_cannot_login(auth_client, migrated_engine):
+    assert auth_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    with Session(migrated_engine) as session:
+        user = session.query(User).filter_by(email="student@example.edu").one()
+        user.is_active = False
+        session.commit()
+    response = auth_client.post("/api/v1/auth/login", json=login_body())
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid email or password"}
+
+
+def test_disabling_account_invalidates_existing_session(auth_client, migrated_engine):
+    auth_client.post("/api/v1/auth/register", json=registration_body())
+    token = auth_client.post("/api/v1/auth/login", json=login_body()).json()["access_token"]
+    with Session(migrated_engine) as session:
+        user = session.query(User).filter_by(email="student@example.edu").one()
+        user.is_active = False
+        session.commit()
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(token)).status_code == 401
+
+
+def test_logout_revokes_only_current_device(auth_client):
+    auth_client.post("/api/v1/auth/register", json=registration_body())
+    first = auth_client.post("/api/v1/auth/login", json=login_body()).json()["access_token"]
+    second = auth_client.post("/api/v1/auth/login", json=login_body()).json()["access_token"]
+    assert first != second
+    assert auth_client.post("/api/v1/auth/logout", headers=access_headers(first)).status_code == 204
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(first)).status_code == 401
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(second)).status_code == 200
+
+
+@pytest.mark.parametrize("authorization", [None, "Basic abc", "Bearer garbage"])
+def test_protected_endpoints_reject_missing_or_invalid_tokens(auth_client, authorization):
+    headers = {"Authorization": authorization} if authorization is not None else {}
+    response = auth_client.get("/api/v1/auth/me", headers=headers)
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert auth_client.post("/api/v1/auth/logout", headers=headers).status_code == 401
+
+
+def test_expired_and_unregistered_tokens_cannot_access_me(auth_client):
+    auth_client.post("/api/v1/auth/register", json=registration_body())
+    original = auth_client.post("/api/v1/auth/login", json=login_body()).json()["access_token"]
+    claims = jwt.decode(original, options={"verify_signature": False})
+    secret = "only-for-tests-0123456789-abcdefghijklmnopqrstuv"
+
+    expired = {**claims, "exp": int(datetime.now(timezone.utc).timestamp()) - 100}
+    expired_token = jwt.encode(expired, secret, algorithm="HS256")
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(expired_token)).status_code == 401
+
+    never_issued = {**claims, "jti": str(uuid4())}
+    forged_token = jwt.encode(never_issued, secret, algorithm="HS256")
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(forged_token)).status_code == 401
+
+    wrong_audience = {**claims, "aud": "not-our-client"}
+    wrong_aud_token = jwt.encode(wrong_audience, secret, algorithm="HS256")
+    assert auth_client.get("/api/v1/auth/me", headers=access_headers(wrong_aud_token)).status_code == 401
+
+
+def test_student_affairs_can_use_same_login_without_self_registration(auth_client, migrated_engine):
+    with Session(migrated_engine) as session:
+        affairs = User(
+            full_name="Affairs Officer",
+            email="affairs@example.edu",
+            university_id="STAFF-01",
+            password_hash=hash_password("OfficerPassphrase#123"),
+            account_type=AccountType.STUDENT_AFFAIRS,
+        )
+        session.add(affairs)
+        session.commit()
+    response = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": " AFFAIRS@EXAMPLE.EDU ", "password": "OfficerPassphrase#123"},
+    )
+    assert response.status_code == 200, response.text
+    profile = auth_client.get("/api/v1/auth/me", headers=access_headers(response.json()["access_token"]))
+    assert profile.status_code == 200
+    assert profile.json()["account_type"] == "student_affairs"
+
+
+def test_short_or_missing_jwt_secret_fails_closed(auth_client, monkeypatch):
+    auth_client.post("/api/v1/auth/register", json=registration_body())
+    monkeypatch.setenv("JWT_SECRET_KEY", "short")
+    response = auth_client.post("/api/v1/auth/login", json=login_body())
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Authentication unavailable"}
+
+
+def test_login_invalid_payload_never_echoes_credentials(auth_client):
+    secret = "DoNotEchoThisSecret"
+    response = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "not-email", "password": secret, "account_type": "student_affairs"},
+    )
+    assert response.status_code == 422
+    assert secret not in response.text
     assert all("input" not in error for error in response.json()["detail"])
