@@ -266,3 +266,32 @@ The second Alembic migration creates `auth_sessions` with a UUID token ID
 It is **not** applied automatically when the server starts. Review and migrate
 the intended local PostgreSQL database separately. Local registration remains
 available without a JWT secret, but login requires the second migration.
+
+## Student Affairs authorization and provisioning
+
+`GET /api/v1/auth/student-affairs` is a minimal authorization check. An active
+Student Affairs account with a valid bearer token receives HTTP 200 and
+`{"account_type":"student_affairs"}`. Missing, invalid, expired, or revoked
+credentials receive HTTP 401. An authenticated Student receives HTTP 403.
+The reusable `require_roles` dependency checks the current PostgreSQL account
+type after validating the token and its session. Client role fields and token
+role claims have no effect. Future club-scoped policies can build on
+`current_identity` and check membership for the specific club being accessed.
+
+Only an authorized operator with access to the intended database should run
+the local provisioning command. From `backend` in an interactive terminal,
+the command displays the configured database host and name and requires you
+to type that target before it accepts account details. It refuses to proceed
+when the target host or database name is missing:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.auth.provision_student_affairs
+```
+
+Enter the full name, email, and University ID when prompted. Enter and confirm
+the password at the hidden prompts. The CLI rejects command-line arguments
+and refuses password entry when echo cannot be suppressed. It validates the
+same fields as registration, hashes with scrypt, and creates a new Student
+Affairs account. An existing email or University ID is rejected without
+changing the existing account. Public registration continues to create only
+Students. This change uses the existing schema and adds no migration.
