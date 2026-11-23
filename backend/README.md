@@ -294,4 +294,21 @@ and refuses password entry when echo cannot be suppressed. It validates the
 same fields as registration, hashes with scrypt, and creates a new Student
 Affairs account. An existing email or University ID is rejected without
 changing the existing account. Public registration continues to create only
-Students. This change uses the existing schema and adds no migration.
+Students. CAMP-63 provisioning uses the existing schema and adds no migration.
+
+## Club browsing API
+
+`GET /api/v1/clubs` requires a valid bearer token for an active Student account.
+It returns approved and active clubs only, ordered by name and UUID. Pending,
+rejected, and inactive records are excluded. The `page` query parameter starts
+at 1 (default 1, maximum 10,000); `page_size` defaults to 20 and is capped at
+100. Invalid pagination values return HTTP 422. Missing or invalid sessions
+return HTTP 401; other account types return HTTP 403.
+
+The response contains a `clubs` array with only `id`, `name`, `description`,
+`category`, and nullable `logo_url`, plus `page`, `page_size`, and `total`.
+For example, an empty result is `{"clubs":[],"page":1,"page_size":20,"total":0}`.
+Approval status, active state, and database timestamps are not exposed.
+
+The PostgreSQL `clubs` table is added by Alembic revision
+`0003_create_clubs`, after `0002_create_auth_sessions`.
