@@ -312,3 +312,23 @@ Approval status, active state, and database timestamps are not exposed.
 
 The PostgreSQL `clubs` table is added by Alembic revision
 `0003_create_clubs`, after `0002_create_auth_sessions`.
+
+`GET /api/v1/clubs/{club_id}` returns details for an approved, active club and
+a bounded page of its upcoming events. It requires an active Student session;
+missing or invalid credentials return HTTP 401, other account types return
+HTTP 403, and nonexistent or hidden clubs return HTTP 404. Events are included
+only when their approval status is `approved`, their explicit `is_published`
+flag is true, and `starts_at` is later than the request's UTC time boundary.
+They are ordered by start time and UUID. Pagination uses the same `page` and
+`page_size` defaults and limits as club browsing.
+
+The response shape is `{"club": {...}, "events": [...], "page": 1,
+"page_size": 20, "total": 0}`. The club uses the safe club summary fields;
+each event contains only `id`, `title`, `description`, `venue`, `starts_at`,
+`ends_at`, and `seat_capacity`. Approval state, publication state, timestamps,
+and event-to-club identifiers are not returned. Event approval defaults to
+`draft`, and `is_published` defaults to false, so approval alone does not
+publish an event.
+
+The PostgreSQL `events` table is added by Alembic revision
+`0004_create_events`, after `0003_create_clubs`.
