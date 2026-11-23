@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.auth.router import router as auth_router
+from app.clubs.router import router as clubs_router
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -14,6 +15,7 @@ from app.database import get_engine
 
 app = FastAPI(title="CampusConnect API", version="0.1.0")
 app.include_router(auth_router)
+app.include_router(clubs_router)
 
 
 @app.exception_handler(RequestValidationError)

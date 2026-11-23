@@ -14,6 +14,7 @@ from app.auth.tokens import JWT_AUDIENCE, JWT_ISSUER
 from app.config import get_jwt_secret
 from app.database import get_db
 from app.main import app
+from app.models.club import Club, ClubApprovalStatus
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import URL, create_engine, inspect, text
@@ -49,14 +50,19 @@ def migrated_engine():
             patch.setattr("app.config.get_database_url", lambda: url)
             command.upgrade(alembic_config, "head")
             try:
+                assert inspect(engine).has_table("clubs")
                 command.check(alembic_config)
                 yield engine
             finally:
                 command.downgrade(alembic_config, "base")
                 with engine.begin() as connection:
                     assert not inspect(connection).has_table("users")
+                    assert not inspect(connection).has_table("clubs")
                     assert connection.scalar(text(
                         "SELECT to_regprocedure('campusconnect_users_before_update()')"
+                    )) is None
+                    assert connection.scalar(text(
+                        "SELECT to_regprocedure('campusconnect_clubs_before_update()')"
                     )) is None
                     # The fixture started with an empty database and owns this table.
                     connection.execute(text("DROP TABLE alembic_version"))
@@ -217,6 +223,7 @@ def registration_client(migrated_engine):
         else:
             app.dependency_overrides[get_db] = previous
         with migrated_engine.begin() as connection:
+            connection.execute(text("DELETE FROM clubs"))
             connection.execute(text("DELETE FROM users"))
 
 
@@ -296,6 +303,13 @@ def login_body(**changes):
 
 def access_headers(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def _student_access_headers(auth_client):
+    assert auth_client.post("/api/v1/auth/register", json=registration_body()).status_code == 201
+    login = auth_client.post("/api/v1/auth/login", json=login_body())
+    assert login.status_code == 200
+    return access_headers(login.json()["access_token"])
 
 
 def test_login_me_and_logout_revoke_session(auth_client, migrated_engine):
@@ -430,6 +444,157 @@ def test_login_invalid_payload_never_echoes_credentials(auth_client):
     assert response.status_code == 422
     assert secret not in response.text
     assert all("input" not in error for error in response.json()["detail"])
+
+
+def test_student_browses_only_approved_active_clubs(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(
+                    name="Zulu Robotics",
+                    description="Robotics club",
+                    category="Technology",
+                    approval_status=ClubApprovalStatus.APPROVED,
+                    is_active=True,
+                    logo_url="https://example.edu/zulu.png",
+                ),
+                Club(
+                    name="Alpha Arts",
+                    description="Arts club",
+                    category="Arts",
+                    approval_status=ClubApprovalStatus.APPROVED,
+                    is_active=True,
+                ),
+                Club(
+                    name="Pending Club",
+                    description="Pending club",
+                    category="Academic",
+                    approval_status=ClubApprovalStatus.PENDING,
+                    is_active=True,
+                ),
+                Club(
+                    name="Rejected Club",
+                    description="Rejected club",
+                    category="Academic",
+                    approval_status=ClubApprovalStatus.REJECTED,
+                    is_active=True,
+                ),
+                Club(
+                    name="Inactive Club",
+                    description="Inactive club",
+                    category="Academic",
+                    approval_status=ClubApprovalStatus.APPROVED,
+                    is_active=False,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = auth_client.get("/api/v1/clubs", headers=headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+    assert body["total"] == 2
+    assert [club["name"] for club in body["clubs"]] == ["Alpha Arts", "Zulu Robotics"]
+    assert set(body["clubs"][0]) == {"id", "name", "description", "category", "logo_url"}
+    assert body["clubs"][1]["logo_url"] == "https://example.edu/zulu.png"
+    assert all(
+        hidden_name not in response.text
+        for hidden_name in ("Pending Club", "Rejected Club", "Inactive Club")
+    )
+
+
+def test_club_timestamps_are_database_managed(migrated_engine, registration_client):
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Timestamp Club",
+            description="Timestamp behavior",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+        )
+        session.add(club)
+        session.commit()
+        original_updated_at = club.updated_at
+        assert club.id is not None
+        assert club.created_at.utcoffset() is not None
+
+        club.description = "Updated timestamp behavior"
+        session.commit()
+        session.refresh(club)
+
+        assert club.updated_at > original_updated_at
+
+
+def test_club_browse_paginates_deterministically_and_bounds_page_size(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(
+                    id=UUID(int=club_id),
+                    name=name,
+                    description=f"{name} description",
+                    category="Academic",
+                    approval_status=ClubApprovalStatus.APPROVED,
+                    is_active=True,
+                )
+                for club_id, name in (
+                    (1, "Alpha Club"),
+                    (2, "Alpha Club"),
+                    (3, "Beta Club"),
+                    (4, "Gamma Club"),
+                )
+            ]
+        )
+        session.commit()
+
+    first_page = auth_client.get("/api/v1/clubs?page=1&page_size=2", headers=headers)
+    second_page = auth_client.get("/api/v1/clubs?page=2&page_size=2", headers=headers)
+    invalid_page = auth_client.get("/api/v1/clubs?page=0", headers=headers)
+    oversized_page = auth_client.get("/api/v1/clubs?page_size=101", headers=headers)
+
+    assert first_page.status_code == second_page.status_code == 200
+    assert [club["id"] for club in first_page.json()["clubs"]] == [str(UUID(int=1)), str(UUID(int=2))]
+    assert [club["name"] for club in second_page.json()["clubs"]] == ["Beta Club", "Gamma Club"]
+    assert first_page.json()["total"] == second_page.json()["total"] == 4
+    assert invalid_page.status_code == oversized_page.status_code == 422
+
+
+def test_empty_club_browse_returns_empty_collection(auth_client):
+    headers = _student_access_headers(auth_client)
+
+    response = auth_client.get("/api/v1/clubs", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"clubs": [], "page": 1, "page_size": 20, "total": 0}
+
+
+def test_student_affairs_cannot_browse_student_clubs(auth_client, migrated_engine):
+    with Session(migrated_engine) as session:
+        session.add(
+            User(
+                full_name="Synthetic Affairs Officer",
+                email="affairs@example.edu",
+                university_id="AFFAIRS-01",
+                password_hash=hash_password("SyntheticAffairsPassword123!"),
+                account_type=AccountType.STUDENT_AFFAIRS,
+            )
+        )
+        session.commit()
+
+    login = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "affairs@example.edu", "password": "SyntheticAffairsPassword123!"},
+    )
+    assert login.status_code == 200
+    response = auth_client.get(
+        "/api/v1/clubs", headers=access_headers(login.json()["access_token"])
+    )
+
+    assert response.status_code == 403
 
 
 _AFFAIRS_PATH = "/api/v1/auth/student-affairs"
