@@ -7,6 +7,7 @@ from sqlalchemy.pool import NullPool
 from app.config import DatabaseConfigurationError, get_database_url
 from app.models.auth_session import AuthSession  # register table with shared Base metadata
 from app.models.club import Club  # register table with shared Base metadata
+from app.models.event import Event  # register table with shared Base metadata
 from app.models.user import User
 
 

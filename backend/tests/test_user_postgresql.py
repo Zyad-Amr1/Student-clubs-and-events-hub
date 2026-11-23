@@ -15,6 +15,7 @@ from app.config import get_jwt_secret
 from app.database import get_db
 from app.main import app
 from app.models.club import Club, ClubApprovalStatus
+from app.models.event import Event, EventApprovalStatus
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import URL, create_engine, inspect, text
@@ -51,6 +52,7 @@ def migrated_engine():
             command.upgrade(alembic_config, "head")
             try:
                 assert inspect(engine).has_table("clubs")
+                assert inspect(engine).has_table("events")
                 command.check(alembic_config)
                 yield engine
             finally:
@@ -58,11 +60,15 @@ def migrated_engine():
                 with engine.begin() as connection:
                     assert not inspect(connection).has_table("users")
                     assert not inspect(connection).has_table("clubs")
+                    assert not inspect(connection).has_table("events")
                     assert connection.scalar(text(
                         "SELECT to_regprocedure('campusconnect_users_before_update()')"
                     )) is None
                     assert connection.scalar(text(
                         "SELECT to_regprocedure('campusconnect_clubs_before_update()')"
+                    )) is None
+                    assert connection.scalar(text(
+                        "SELECT to_regprocedure('campusconnect_events_before_update()')"
                     )) is None
                     # The fixture started with an empty database and owns this table.
                     connection.execute(text("DROP TABLE alembic_version"))
@@ -223,6 +229,7 @@ def registration_client(migrated_engine):
         else:
             app.dependency_overrides[get_db] = previous
         with migrated_engine.begin() as connection:
+            connection.execute(text("DELETE FROM events"))
             connection.execute(text("DELETE FROM clubs"))
             connection.execute(text("DELETE FROM users"))
 
@@ -678,3 +685,403 @@ def test_affairs_provisioning_rejects_duplicates_without_promoting(
         users = session.query(User).all()
         assert len(users) == 1
         assert users[0].account_type is AccountType.STUDENT
+
+
+def test_student_sees_only_approved_published_future_events_for_visible_club(
+    auth_client, migrated_engine
+):
+    headers = _student_access_headers(auth_client)
+    now = datetime.now(timezone.utc)
+    future = now + timedelta(days=2)
+    past = now - timedelta(days=2)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Visible Event Club",
+            description="Visible club description",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+            is_active=True,
+            logo_url="https://example.edu/club.png",
+        )
+        pending_club = Club(
+            name="Pending Event Club",
+            description="Hidden club description",
+            category="Academic",
+            approval_status=ClubApprovalStatus.PENDING,
+            is_active=True,
+        )
+        other_club = Club(
+            name="Other Visible Club",
+            description="Different club description",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+            is_active=True,
+        )
+        session.add_all([club, pending_club, other_club])
+        session.flush()
+        visible_club_id = club.id
+
+        session.add_all(
+            [
+                Event(
+                    club_id=club.id,
+                    title="Visible future event",
+                    description="Public event details",
+                    venue="Main Hall",
+                    starts_at=future,
+                    ends_at=future + timedelta(hours=2),
+                    seat_capacity=50,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=club.id,
+                    title="Draft event",
+                    description="Draft details",
+                    venue="Draft Room",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.DRAFT,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=club.id,
+                    title="Pending event",
+                    description="Pending details",
+                    venue="Pending Room",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.PENDING,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=club.id,
+                    title="Rejected event",
+                    description="Rejected details",
+                    venue="Rejected Room",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.REJECTED,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=club.id,
+                    title="Unpublished event",
+                    description="Unpublished details",
+                    venue="Private Room",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=False,
+                ),
+                Event(
+                    club_id=club.id,
+                    title="Past event",
+                    description="Past details",
+                    venue="Old Hall",
+                    starts_at=past,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=other_club.id,
+                    title="Other club event",
+                    description="Other club details",
+                    venue="Other Hall",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=True,
+                ),
+                Event(
+                    club_id=pending_club.id,
+                    title="Hidden club event",
+                    description="Hidden club event details",
+                    venue="Hidden Hall",
+                    starts_at=future,
+                    seat_capacity=10,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=True,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = auth_client.get(f"/api/v1/clubs/{visible_club_id}", headers=headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert set(body) == {"club", "events", "page", "page_size", "total"}
+    assert body["club"] == {
+        "id": str(visible_club_id),
+        "name": "Visible Event Club",
+        "description": "Visible club description",
+        "category": "Academic",
+        "logo_url": "https://example.edu/club.png",
+    }
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+    assert body["total"] == 1
+    assert [event["title"] for event in body["events"]] == ["Visible future event"]
+    assert set(body["events"][0]) == {
+        "id",
+        "title",
+        "description",
+        "venue",
+        "starts_at",
+        "ends_at",
+        "seat_capacity",
+    }
+    starts_at = datetime.fromisoformat(body["events"][0]["starts_at"].replace("Z", "+00:00"))
+    assert starts_at.utcoffset() == timedelta(0)
+    assert all(
+        hidden_title not in response.text
+        for hidden_title in (
+            "Draft event",
+            "Pending event",
+            "Rejected event",
+            "Unpublished event",
+            "Past event",
+            "Other club event",
+            "Hidden club event",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("approval_status", "is_active"),
+    [
+        (ClubApprovalStatus.PENDING, True),
+        (ClubApprovalStatus.REJECTED, True),
+        (ClubApprovalStatus.APPROVED, False),
+    ],
+)
+def test_student_gets_not_found_for_hidden_clubs(
+    auth_client, migrated_engine, approval_status, is_active
+):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Hidden Detail Club",
+            description="Hidden club",
+            category="Academic",
+            approval_status=approval_status,
+            is_active=is_active,
+        )
+        session.add(club)
+        session.commit()
+        club_id = club.id
+
+    hidden = auth_client.get(f"/api/v1/clubs/{club_id}", headers=headers)
+    nonexistent = auth_client.get(f"/api/v1/clubs/{uuid4()}", headers=headers)
+
+    assert hidden.status_code == nonexistent.status_code == 404
+
+
+def test_student_affairs_cannot_get_club_details(auth_client, migrated_engine):
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Student Detail Club",
+            description="Visible to Students",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+            is_active=True,
+        )
+        officer = User(
+            full_name="Synthetic Affairs Officer",
+            email="details-affairs@example.edu",
+            university_id="DETAILS-AFFAIRS-01",
+            password_hash=hash_password("SyntheticAffairsPassword123!"),
+            account_type=AccountType.STUDENT_AFFAIRS,
+        )
+        session.add_all([club, officer])
+        session.commit()
+        club_id = club.id
+
+    login = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "details-affairs@example.edu", "password": "SyntheticAffairsPassword123!"},
+    )
+    assert login.status_code == 200
+    response = auth_client.get(
+        f"/api/v1/clubs/{club_id}", headers=access_headers(login.json()["access_token"])
+    )
+
+    assert response.status_code == 403
+
+
+def test_club_details_returns_empty_event_page(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Empty Events Club",
+            description="No upcoming events",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+            is_active=True,
+        )
+        session.add(club)
+        session.commit()
+        club_id = club.id
+
+    response = auth_client.get(f"/api/v1/clubs/{club_id}", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["events"] == []
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+    assert body["total"] == 0
+
+
+def test_club_details_paginates_events_by_start_time_then_uuid(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    starts_at = datetime.now(timezone.utc) + timedelta(days=3)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Pagination Events Club",
+            description="Stable order",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+            is_active=True,
+        )
+        session.add(club)
+        session.flush()
+        club_id = club.id
+        session.add_all(
+            [
+                Event(
+                    id=UUID(int=event_id),
+                    club_id=club_id,
+                    title=f"Event {event_id}",
+                    description="Upcoming event",
+                    venue="Main Hall",
+                    starts_at=starts_at,
+                    seat_capacity=25,
+                    approval_status=EventApprovalStatus.APPROVED,
+                    is_published=True,
+                )
+                for event_id in (1, 2, 3, 4)
+            ]
+        )
+        session.commit()
+
+    first_page = auth_client.get(
+        f"/api/v1/clubs/{club_id}?page=1&page_size=2", headers=headers
+    )
+    second_page = auth_client.get(
+        f"/api/v1/clubs/{club_id}?page=2&page_size=2", headers=headers
+    )
+    invalid_page = auth_client.get(f"/api/v1/clubs/{club_id}?page=0", headers=headers)
+    oversized_page = auth_client.get(
+        f"/api/v1/clubs/{club_id}?page_size=101", headers=headers
+    )
+
+    assert first_page.status_code == second_page.status_code == 200
+    assert [event["id"] for event in first_page.json()["events"]] == [
+        str(UUID(int=1)),
+        str(UUID(int=2)),
+    ]
+    assert [event["id"] for event in second_page.json()["events"]] == [
+        str(UUID(int=3)),
+        str(UUID(int=4)),
+    ]
+    assert first_page.json()["total"] == second_page.json()["total"] == 4
+    assert invalid_page.status_code == oversized_page.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "constraint"),
+    [
+        ("title", "ck_events_title_nonblank"),
+        ("seat_capacity", "ck_events_seat_capacity_positive"),
+        ("ends_at", "ck_events_ends_after_start"),
+    ],
+)
+def test_postgresql_enforces_event_field_constraints(migrated_engine, field, constraint):
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Constraint Test Club",
+            description="Event constraint test",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+        )
+        session.add(club)
+        session.flush()
+        event = Event(
+            club_id=club.id,
+            title="Valid event title",
+            description="Valid event description",
+            venue="Valid venue",
+            starts_at=starts_at,
+            ends_at=starts_at + timedelta(hours=1),
+            seat_capacity=10,
+            approval_status=EventApprovalStatus.APPROVED,
+            is_published=True,
+        )
+        if field == "title":
+            event.title = "\t\n"
+        elif field == "seat_capacity":
+            event.seat_capacity = 0
+        else:
+            event.ends_at = starts_at
+        session.add(event)
+        with pytest.raises(IntegrityError) as error:
+            session.flush()
+        assert error.value.orig.diag.constraint_name == constraint
+
+
+def test_postgresql_enforces_event_club_foreign_key(migrated_engine):
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    with Session(migrated_engine) as session:
+        session.add(
+            Event(
+                club_id=uuid4(),
+                title="Orphan event",
+                description="Must reference a club",
+                venue="Main Hall",
+                starts_at=starts_at,
+                seat_capacity=10,
+            )
+        )
+        with pytest.raises(IntegrityError) as error:
+            session.flush()
+        assert error.value.orig.diag.constraint_name == "fk_events_club_id_clubs"
+
+
+def test_postgresql_event_defaults_and_database_managed_timestamps(
+    migrated_engine, registration_client
+):
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    with Session(migrated_engine) as session:
+        club = Club(
+            name="Event Timestamp Club",
+            description="Event timestamp test",
+            category="Academic",
+            approval_status=ClubApprovalStatus.APPROVED,
+        )
+        session.add(club)
+        session.flush()
+        event = Event(
+            club_id=club.id,
+            title="Initial event title",
+            description="Event defaults and timestamp behavior",
+            venue="Main Hall",
+            starts_at=starts_at,
+            seat_capacity=10,
+        )
+        session.add(event)
+        session.commit()
+        original_updated_at = event.updated_at
+
+        assert event.approval_status is EventApprovalStatus.DRAFT
+        assert event.is_published is False
+        assert event.created_at.utcoffset() is not None
+        assert event.updated_at.utcoffset() is not None
+
+        event.title = "Updated event title"
+        session.commit()
+        session.refresh(event)
+        assert event.updated_at > original_updated_at
