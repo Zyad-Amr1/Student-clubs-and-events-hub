@@ -280,16 +280,28 @@ def test_unexpected_payload_cannot_approve_or_publish(
         scenario["headers"]["owner"],
         json={"approval_status": "approved", "is_published": True},
     )
-    assert result.status_code in (200, 422)
+    assert result.status_code == 422
+    assert result.json() == {"detail": "Request body is not allowed"}
     current = state(draft_test_engine, owned_draft["id"])
-    assert current.approval_status in ("draft", "pending")
+    assert current.approval_status == "draft"
     assert current.is_published is False
-    if result.status_code == 200:
-        assert result.json()["approval_status"] == "pending"
-        assert result.json()["is_published"] is False
-    else:
-        assert current.approval_status == "draft"
 
+
+
+@pytest.mark.parametrize("unexpected_json", [{}, {"is_published": False}, []])
+def test_any_request_body_is_rejected_without_state_change(
+    draft_client, draft_test_engine, scenario, owned_draft, unexpected_json
+):
+    result = submit(
+        draft_client, scenario["ids"]["club"], owned_draft["id"],
+        scenario["headers"]["owner"],
+        json=unexpected_json,
+    )
+    assert result.status_code == 422
+    assert result.json() == {"detail": "Request body is not allowed"}
+    current = state(draft_test_engine, owned_draft["id"])
+    assert current.approval_status == "draft"
+    assert current.is_published is False
 
 def test_concurrent_submissions_have_single_winner(
     draft_client, draft_test_engine, scenario, owned_draft

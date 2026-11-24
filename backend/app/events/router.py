@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -103,6 +103,12 @@ def _ensure_ready_to_submit(event: Event) -> None:
         raise HTTPException(status_code=422, detail="Draft event details are invalid")
 
 
+async def _reject_submit_body(request: Request) -> None:
+    """Submit is a command with no payload; never accept client-controlled state."""
+    if await request.body():
+        raise HTTPException(status_code=422, detail="Request body is not allowed")
+
+
 @router.post(
     "/{club_id}/events/{event_id}/submit",
     status_code=status.HTTP_200_OK,
@@ -113,7 +119,7 @@ def _ensure_ready_to_submit(event: Event) -> None:
         403: {"description": "Student account required; no Student Affairs override"},
         404: {"description": "Club or draft event not found or access denied"},
         409: {"description": "Event is not an unpublished draft"},
-        422: {"description": "Invalid event identifiers or draft is not ready"},
+        422: {"description": "Invalid identifiers, invalid draft, or unexpected request body"},
     },
 )
 def submit_draft_event(

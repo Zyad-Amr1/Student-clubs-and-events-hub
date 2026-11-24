@@ -341,7 +341,7 @@ for the specified active club can submit their existing draft:
 
 `POST /api/v1/clubs/{club_id}/events/{event_id}/submit`
 
-Requires `Authorization: Bearer <access_token>` and no request body. A successful
+Requires `Authorization: Bearer <access_token>` and **forbids any request body**. Any nonempty request body, including `{}`, returns HTTP 422 without changing event state. A successful
 request returns HTTP 200 and the event fields, with `approval_status: "pending"`
 and `is_published: false`. Submission does **not** perform an approval decision,
 publish the event, or notify Student Affairs. Public Club Details continues to
