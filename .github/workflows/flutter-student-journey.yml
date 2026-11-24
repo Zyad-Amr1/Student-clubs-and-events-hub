@@ -27,17 +27,7 @@ jobs:
         run: flutter pub get
       - name: Check Dart formatting
         working-directory: mobile
-        run: |
-          dart format lib test
-          echo __BEGIN_FMT_CLUB__
-          base64 -w0 lib/features/clubs/presentation/clubs_screen.dart
-          echo
-          echo __END_FMT_CLUB__
-          echo __BEGIN_FMT_WIDGET__
-          base64 -w0 test/widget_test.dart
-          echo
-          echo __END_FMT_WIDGET__
-          git diff --exit-code -- lib test
+        run: dart format --output=none --set-exit-if-changed lib test
       - name: Flutter analyzer
         working-directory: mobile
         run: flutter analyze
