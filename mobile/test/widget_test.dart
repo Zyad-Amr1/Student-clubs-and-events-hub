@@ -238,10 +238,7 @@ void main() {
       await tester.tap(find.text('Clear filters'));
       await tester.pumpAndSettle();
       expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
-      expect(
-        backend.paths.where((path) => path == '/api/v1/clubs').length,
-        1,
-      );
+      expect(backend.paths.where((path) => path == '/api/v1/clubs').length, 1);
     },
   );
 
