@@ -48,7 +48,7 @@ def create_draft_event(
             Club.is_active.is_(True),
             ClubAdministrator.user_id == identity.user.id,
         )
-        .with_for_update(of=Club)
+        .with_for_update(of=(Club, ClubAdministrator))
     )
     if club is None:
         # Avoid revealing whether an inaccessible club exists.

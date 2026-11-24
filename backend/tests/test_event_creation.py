@@ -84,8 +84,14 @@ def draft_client(draft_test_engine, monkeypatch):
             connection.execute(text("DELETE FROM users"))
 
 
+@pytest.fixture(scope="module")
+def synthetic_test_password_hash():
+    """Reuse the same valid test password hash, retaining per-test user isolation."""
+    return hash_password("SyntheticEventTestPassword#123")
+
+
 @pytest.fixture
-def scenario(draft_test_engine, draft_client):
+def scenario(draft_test_engine, draft_client, synthetic_test_password_hash):
     password = "SyntheticEventTestPassword#123"
     with Session(draft_test_engine) as session:
         club = Club(
@@ -102,17 +108,17 @@ def scenario(draft_test_engine, draft_client):
         )
         owner = User(
             full_name="Synthetic Club Owner", email="draft-owner@example.edu",
-            university_id="DRAFT-OWNER", password_hash=hash_password(password),
+            university_id="DRAFT-OWNER", password_hash=synthetic_test_password_hash,
             account_type=AccountType.STUDENT,
         )
         student = User(
             full_name="Synthetic Regular Student", email="draft-student@example.edu",
-            university_id="DRAFT-STUDENT", password_hash=hash_password(password),
+            university_id="DRAFT-STUDENT", password_hash=synthetic_test_password_hash,
             account_type=AccountType.STUDENT,
         )
         affairs = User(
             full_name="Synthetic Affairs Officer", email="draft-affairs@example.edu",
-            university_id="DRAFT-AFFAIRS", password_hash=hash_password(password),
+            university_id="DRAFT-AFFAIRS", password_hash=synthetic_test_password_hash,
             account_type=AccountType.STUDENT_AFFAIRS,
         )
         session.add_all([club, other, inactive, owner, student, affairs])
