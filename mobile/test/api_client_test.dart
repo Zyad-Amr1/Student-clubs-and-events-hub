@@ -278,29 +278,28 @@ void main() {
     },
   );
 
-  test('rejects unauthorized HTTP hosts before credentials leave the app',
-      () async {
-    final fake = FakeApiTransport((call) => ok({}));
-    for (final host in [
-      'http://192.168.1.10:8000',
-      'http://example.org:8000',
-      'http://10.0.2.2.attacker.example:8000',
-    ]) {
-      final api = CampusApi(
-        transport: fake,
-        baseUri: Uri.parse(host),
-      );
-      await expectLater(
-        api.login('student@example.edu', 'private-password'),
-        throwsA(isA<ApiFailure>()),
-      );
-      await expectLater(
-        api.clubs('private-bearer-token'),
-        throwsA(isA<ApiFailure>()),
-      );
-    }
-    expect(fake.calls, isEmpty);
-  });
+  test(
+    'rejects unauthorized HTTP hosts before credentials leave the app',
+    () async {
+      final fake = FakeApiTransport((call) => ok({}));
+      for (final host in [
+        'http://192.168.1.10:8000',
+        'http://example.org:8000',
+        'http://10.0.2.2.attacker.example:8000',
+      ]) {
+        final api = CampusApi(transport: fake, baseUri: Uri.parse(host));
+        await expectLater(
+          api.login('student@example.edu', 'private-password'),
+          throwsA(isA<ApiFailure>()),
+        );
+        await expectLater(
+          api.clubs('private-bearer-token'),
+          throwsA(isA<ApiFailure>()),
+        );
+      }
+      expect(fake.calls, isEmpty);
+    },
+  );
 
   test('accepts HTTPS configured backend with credentials', () async {
     final fake = FakeApiTransport(
