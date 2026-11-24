@@ -56,21 +56,21 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'CampusConnect',
-        debugShowCheckedModeBanner: false,
-        theme: CampusConnectTheme.light,
-        builder: (context, child) => StudentSessionScope(
-          session: _session,
-          child: child ?? const SizedBox.shrink(),
-        ),
-        initialRoute: AppRoutes.home,
-        routes: {
-          AppRoutes.home: (context) => const _HomeGate(),
-          AppRoutes.authentication: (context) => const AuthScreen(),
-          AppRoutes.clubs: (context) => const ClubsScreen(),
-          AppRoutes.profile: (context) => const ProfileScreen(),
-        },
-      );
+    title: 'CampusConnect',
+    debugShowCheckedModeBanner: false,
+    theme: CampusConnectTheme.light,
+    builder: (context, child) => StudentSessionScope(
+      session: _session,
+      child: child ?? const SizedBox.shrink(),
+    ),
+    initialRoute: AppRoutes.home,
+    routes: {
+      AppRoutes.home: (context) => const _HomeGate(),
+      AppRoutes.authentication: (context) => const AuthScreen(),
+      AppRoutes.clubs: (context) => const ClubsScreen(),
+      AppRoutes.profile: (context) => const ProfileScreen(),
+    },
+  );
 }
 
 class _HomeGate extends StatelessWidget {
@@ -80,9 +80,7 @@ class _HomeGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = StudentSessionScope.of(context);
     if (!session.ready) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (session.restoreError != null && !session.signedIn) {
       return Scaffold(
@@ -93,10 +91,7 @@ class _HomeGate extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  session.restoreError!,
-                  textAlign: TextAlign.center,
-                ),
+                Text(session.restoreError!, textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: session.restore,

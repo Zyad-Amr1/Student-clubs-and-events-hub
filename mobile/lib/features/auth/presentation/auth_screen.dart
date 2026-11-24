@@ -55,10 +55,8 @@ class _AuthScreenState extends State<AuthScreen> {
         await session.signIn(_email.text, _password.text);
       }
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.clubs,
-        (route) => false,
-      );
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(AppRoutes.clubs, (route) => false);
     } on ApiFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
@@ -72,142 +70,152 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(_register ? 'Create student account' : 'Student login')),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _register ? 'Join CampusConnect' : 'Welcome back',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 20),
-                      if (_register) ...[
-                        TextFormField(
-                          key: const ValueKey('register-name'),
-                          controller: _name,
-                          textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            labelText: 'Full name',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            final required = _required(value);
-                            if (required != null) return required;
-                            return value!.trim().length < 2 ? 'Enter your full name' : null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      TextFormField(
-                        key: const ValueKey('auth-email'),
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'University email',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          final required = _required(value);
-                          if (required != null) return required;
-                          return !value!.contains('@') ? 'Enter a valid email' : null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      if (_register) ...[
-                        TextFormField(
-                          key: const ValueKey('register-university-id'),
-                          controller: _universityId,
-                          decoration: const InputDecoration(
-                            labelText: 'University ID',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: _required,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      TextFormField(
-                        key: const ValueKey('auth-password'),
-                        controller: _password,
-                        obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          final required = _required(value);
-                          if (required != null) return required;
-                          if (_register && value!.length < 8) return 'Use at least 8 characters';
-                          return null;
-                        },
-                      ),
-                      if (_register) ...[
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          key: const ValueKey('register-confirm-password'),
-                          controller: _confirmation,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirm password',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value != _password.text) return 'Passwords do not match';
-                            return _required(value);
-                          },
-                        ),
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          key: const ValueKey('auth-error'),
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        key: const ValueKey('auth-submit'),
-                        onPressed: _submitting ? null : _submit,
-                        child: _submitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(_register ? 'Register and sign in' : 'Sign in'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        key: const ValueKey('auth-toggle'),
-                        onPressed: _submitting
-                            ? null
-                            : () => setState(() {
-                                  _register = !_register;
-                                  _error = null;
-                                  _formKey.currentState?.reset();
-                                }),
-                        child: Text(
-                          _register
-                              ? 'Already have an account? Sign in'
-                              : 'New student? Create an account',
-                        ),
-                      ),
-                    ],
+    appBar: AppBar(
+      title: Text(_register ? 'Create student account' : 'Student login'),
+    ),
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _register ? 'Join CampusConnect' : 'Welcome back',
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  if (_register) ...[
+                    TextFormField(
+                      key: const ValueKey('register-name'),
+                      controller: _name,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Full name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        final required = _required(value);
+                        if (required != null) return required;
+                        return value!.trim().length < 2
+                            ? 'Enter your full name'
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextFormField(
+                    key: const ValueKey('auth-email'),
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: const InputDecoration(
+                      labelText: 'University email',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      final required = _required(value);
+                      if (required != null) return required;
+                      return !value!.contains('@')
+                          ? 'Enter a valid email'
+                          : null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (_register) ...[
+                    TextFormField(
+                      key: const ValueKey('register-university-id'),
+                      controller: _universityId,
+                      decoration: const InputDecoration(
+                        labelText: 'University ID',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: _required,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextFormField(
+                    key: const ValueKey('auth-password'),
+                    controller: _password,
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      final required = _required(value);
+                      if (required != null) return required;
+                      if (_register && value!.length < 8)
+                        return 'Use at least 8 characters';
+                      return null;
+                    },
+                  ),
+                  if (_register) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: const ValueKey('register-confirm-password'),
+                      controller: _confirmation,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value != _password.text)
+                          return 'Passwords do not match';
+                        return _required(value);
+                      },
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      key: const ValueKey('auth-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    key: const ValueKey('auth-submit'),
+                    onPressed: _submitting ? null : _submit,
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_register ? 'Register and sign in' : 'Sign in'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    key: const ValueKey('auth-toggle'),
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() {
+                            _register = !_register;
+                            _error = null;
+                            _formKey.currentState?.reset();
+                          }),
+                    child: Text(
+                      _register
+                          ? 'Already have an account? Sign in'
+                          : 'New student? Create an account',
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }

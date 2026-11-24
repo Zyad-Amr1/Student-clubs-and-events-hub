@@ -41,11 +41,12 @@ class IoApiTransport implements ApiTransport {
     required Map<String, String> headers,
     String? body,
   }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
-      final request = await client.openUrl(method, uri).timeout(
-        const Duration(seconds: 12),
-      );
+      final request = await client
+          .openUrl(method, uri)
+          .timeout(const Duration(seconds: 12));
       headers.forEach(request.headers.set);
       if (body != null) {
         request.write(body);
@@ -53,9 +54,10 @@ class IoApiTransport implements ApiTransport {
       final response = await request.close().timeout(
         const Duration(seconds: 12),
       );
-      final text = await utf8.decoder.bind(response).join().timeout(
-        const Duration(seconds: 12),
-      );
+      final text = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(const Duration(seconds: 12));
       return ApiReply(response.statusCode, text);
     } on SocketException {
       throw const ApiFailure(
@@ -91,12 +93,12 @@ class StudentProfile {
   final String accountType;
 
   factory StudentProfile.fromJson(JsonObject json) => StudentProfile(
-        id: json['id'] as String,
-        fullName: json['full_name'] as String,
-        email: json['email'] as String,
-        universityId: json['university_id'] as String,
-        accountType: json['account_type'] as String,
-      );
+    id: json['id'] as String,
+    fullName: json['full_name'] as String,
+    email: json['email'] as String,
+    universityId: json['university_id'] as String,
+    accountType: json['account_type'] as String,
+  );
 }
 
 class CampusClub {
@@ -115,12 +117,12 @@ class CampusClub {
   final String? logoUrl;
 
   factory CampusClub.fromJson(JsonObject json) => CampusClub(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        description: json['description'] as String,
-        category: json['category'] as String,
-        logoUrl: json['logo_url'] as String?,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    description: json['description'] as String,
+    category: json['category'] as String,
+    logoUrl: json['logo_url'] as String?,
+  );
 }
 
 class CampusEvent {
@@ -143,16 +145,16 @@ class CampusEvent {
   final int seatCapacity;
 
   factory CampusEvent.fromJson(JsonObject json) => CampusEvent(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String,
-        venue: json['venue'] as String,
-        startsAt: DateTime.parse(json['starts_at'] as String),
-        endsAt: json['ends_at'] == null
-            ? null
-            : DateTime.parse(json['ends_at'] as String),
-        seatCapacity: json['seat_capacity'] as int,
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    venue: json['venue'] as String,
+    startsAt: DateTime.parse(json['starts_at'] as String),
+    endsAt: json['ends_at'] == null
+        ? null
+        : DateTime.parse(json['ends_at'] as String),
+    seatCapacity: json['seat_capacity'] as int,
+  );
 }
 
 class ClubPage {
@@ -169,13 +171,13 @@ class ClubPage {
   final int total;
 
   factory ClubPage.fromJson(JsonObject json) => ClubPage(
-        clubs: (json['clubs'] as List<dynamic>)
-            .map((item) => CampusClub.fromJson(item as JsonObject))
-            .toList(),
-        page: json['page'] as int,
-        pageSize: json['page_size'] as int,
-        total: json['total'] as int,
-      );
+    clubs: (json['clubs'] as List<dynamic>)
+        .map((item) => CampusClub.fromJson(item as JsonObject))
+        .toList(),
+    page: json['page'] as int,
+    pageSize: json['page_size'] as int,
+    total: json['total'] as int,
+  );
 }
 
 class ClubDetails {
@@ -190,22 +192,25 @@ class ClubDetails {
   final int total;
 
   factory ClubDetails.fromJson(JsonObject json) => ClubDetails(
-        club: CampusClub.fromJson(json['club'] as JsonObject),
-        events: (json['events'] as List<dynamic>)
-            .map((item) => CampusEvent.fromJson(item as JsonObject))
-            .toList(),
-        total: json['total'] as int,
-      );
+    club: CampusClub.fromJson(json['club'] as JsonObject),
+    events: (json['events'] as List<dynamic>)
+        .map((item) => CampusEvent.fromJson(item as JsonObject))
+        .toList(),
+    total: json['total'] as int,
+  );
 }
 
 class CampusApi {
   CampusApi({ApiTransport? transport, Uri? baseUri})
-      : _transport = transport ?? IoApiTransport(),
-        baseUri = baseUri ??
-            Uri.parse(const String.fromEnvironment(
+    : _transport = transport ?? IoApiTransport(),
+      baseUri =
+          baseUri ??
+          Uri.parse(
+            const String.fromEnvironment(
               'API_BASE_URL',
               defaultValue: 'http://10.0.2.2:8000',
-            ));
+            ),
+          );
 
   final ApiTransport _transport;
   final Uri baseUri;
@@ -242,7 +247,9 @@ class CampusApi {
 
     dynamic decoded;
     try {
-      decoded = reply.body.isEmpty ? <String, dynamic>{} : jsonDecode(reply.body);
+      decoded = reply.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(reply.body);
     } on FormatException {
       throw const ApiFailure('Unexpected backend response.');
     }
@@ -270,20 +277,25 @@ class CampusApi {
     required String password,
     required String confirmPassword,
   }) async {
-    await _request('POST', '/api/v1/auth/register', body: {
-      'full_name': fullName,
-      'email': email,
-      'university_id': universityId,
-      'password': password,
-      'confirm_password': confirmPassword,
-    });
+    await _request(
+      'POST',
+      '/api/v1/auth/register',
+      body: {
+        'full_name': fullName,
+        'email': email,
+        'university_id': universityId,
+        'password': password,
+        'confirm_password': confirmPassword,
+      },
+    );
   }
 
   Future<String> login(String email, String password) async {
-    final json = await _request('POST', '/api/v1/auth/login', body: {
-      'email': email,
-      'password': password,
-    });
+    final json = await _request(
+      'POST',
+      '/api/v1/auth/login',
+      body: {'email': email, 'password': password},
+    );
     final token = json['access_token'];
     if (token is! String || token.isEmpty || json['token_type'] != 'bearer') {
       throw const ApiFailure('Invalid sign-in response.');
@@ -292,8 +304,8 @@ class CampusApi {
   }
 
   Future<StudentProfile> profile(String token) async => StudentProfile.fromJson(
-        await _request('GET', '/api/v1/auth/me', token: token),
-      );
+    await _request('GET', '/api/v1/auth/me', token: token),
+  );
 
   Future<void> logout(String token) async {
     await _request('POST', '/api/v1/auth/logout', token: token);

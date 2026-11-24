@@ -18,10 +18,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await StudentSessionScope.of(context).logout();
     } finally {
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.home,
-          (route) => false,
-        );
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
       }
     }
   }

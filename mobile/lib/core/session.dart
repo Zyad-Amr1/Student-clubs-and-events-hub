@@ -93,7 +93,10 @@ class StudentSession extends ChangeNotifier {
         } catch (_) {
           // Local access is denied even if remote revocation is unavailable.
         }
-        throw const ApiFailure('This app is for Student accounts only.', statusCode: 403);
+        throw const ApiFailure(
+          'This app is for Student accounts only.',
+          statusCode: 403,
+        );
       }
       await store.write(token);
       _token = token;

@@ -55,14 +55,15 @@ class _ClubsScreenState extends State<ClubsScreen> {
     } on ApiFailure catch (error) {
       if (!mounted) return;
       if (error.statusCode == 401) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.authentication, (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.authentication, (route) => false);
         return;
       }
       setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not load clubs. Please retry.');
+      if (mounted)
+        setState(() => _error = 'Could not load clubs. Please retry.');
     } finally {
       if (mounted) {
         setState(() {
@@ -82,7 +83,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
         body: Center(
           child: FilledButton(
             onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
-              AppRoutes.authentication, (route) => false,
+              AppRoutes.authentication,
+              (route) => false,
             ),
             child: const Text('Sign in to browse clubs'),
           ),
@@ -105,73 +107,74 @@ class _ClubsScreenState extends State<ClubsScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null && _clubs.isEmpty
-                ? _MessageState(
-                    message: _error!,
-                    onRetry: () => _load(reset: true),
-                  )
-                : _clubs.isEmpty
-                    ? _MessageState(
-                        message: 'No approved active clubs are available yet.',
-                        onRetry: () => _load(reset: true),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _load(reset: true),
-                        child: ListView.builder(
-                          key: const ValueKey('club-list'),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _clubs.length +
-                              (_clubs.length < _total || _error != null ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _clubs.length) {
-                              return Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: _error != null
-                                    ? Column(
-                                        children: [
-                                          Text(_error!),
-                                          TextButton(
-                                            onPressed: _loadingMore
-                                                ? null : () => _load(),
-                                            child: const Text('Retry'),
-                                          ),
-                                        ],
-                                      )
-                                    : Center(
-                                        child: TextButton(
-                                          key: const ValueKey('load-more-clubs'),
-                                          onPressed: _loadingMore
-                                              ? null : () => _load(),
-                                          child: Text(_loadingMore
-                                              ? 'Loading...'
-                                              : 'Load more clubs'),
-                                        ),
-                                      ),
-                              );
-                            }
-                            final club = _clubs[index];
-                            return Card(
-                              child: ListTile(
-                                key: ValueKey('club-${club.id}'),
-                                leading: const Icon(Icons.groups_outlined),
-                                title: Text(club.name),
-                                subtitle: Text(
-                                  '${club.category} · ${club.description}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (context) =>
-                                        ClubDetailsScreen(club: club),
+            ? _MessageState(message: _error!, onRetry: () => _load(reset: true))
+            : _clubs.isEmpty
+            ? _MessageState(
+                message: 'No approved active clubs are available yet.',
+                onRetry: () => _load(reset: true),
+              )
+            : RefreshIndicator(
+                onRefresh: () => _load(reset: true),
+                child: ListView.builder(
+                  key: const ValueKey('club-list'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  itemCount:
+                      _clubs.length +
+                      (_clubs.length < _total || _error != null ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _clubs.length) {
+                      return Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: _error != null
+                            ? Column(
+                                children: [
+                                  Text(_error!),
+                                  TextButton(
+                                    onPressed: _loadingMore
+                                        ? null
+                                        : () => _load(),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              )
+                            : Center(
+                                child: TextButton(
+                                  key: const ValueKey('load-more-clubs'),
+                                  onPressed: _loadingMore
+                                      ? null
+                                      : () => _load(),
+                                  child: Text(
+                                    _loadingMore
+                                        ? 'Loading...'
+                                        : 'Load more clubs',
                                   ),
                                 ),
                               ),
-                            );
-                          },
+                      );
+                    }
+                    final club = _clubs[index];
+                    return Card(
+                      child: ListTile(
+                        key: ValueKey('club-${club.id}'),
+                        leading: const Icon(Icons.groups_outlined),
+                        title: Text(club.name),
+                        subtitle: Text(
+                          '${club.category} · ${club.description}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) => ClubDetailsScreen(club: club),
+                          ),
                         ),
                       ),
+                    );
+                  },
+                ),
+              ),
       ),
     );
   }
@@ -185,22 +188,22 @@ class _MessageState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.explore_outlined, size: 52),
-              const SizedBox(height: 16),
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                key: const ValueKey('retry-clubs'),
-                onPressed: onRetry,
-                child: const Text('Refresh'),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.explore_outlined, size: 52),
+          const SizedBox(height: 16),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            key: const ValueKey('retry-clubs'),
+            onPressed: onRetry,
+            child: const Text('Refresh'),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }

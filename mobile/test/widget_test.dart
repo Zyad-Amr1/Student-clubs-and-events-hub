@@ -14,6 +14,7 @@ class _MemoryStore implements TokenStore {
   Future<void> write(String value) async {
     token = value;
   }
+
   @override
   Future<void> clear() async {
     token = null;
@@ -35,37 +36,61 @@ class _MockTransport implements ApiTransport {
   }) async {
     paths.add(uri.path);
     if (uri.path.endsWith('/register')) {
-      return ApiReply(201, jsonEncode({
-        'id': '11111111-1111-4111-8111-111111111111',
-        'full_name': 'Student User',
-        'email': 'student@example.edu',
-        'university_id': 'S-001',
-        'account_type': 'student',
-        'is_active': true,
-        'created_at': '2026-11-24T12:00:00Z',
-      }));
+      return ApiReply(
+        201,
+        jsonEncode({
+          'id': '11111111-1111-4111-8111-111111111111',
+          'full_name': 'Student User',
+          'email': 'student@example.edu',
+          'university_id': 'S-001',
+          'account_type': 'student',
+          'is_active': true,
+          'created_at': '2026-11-24T12:00:00Z',
+        }),
+      );
     }
     if (uri.path.endsWith('/login')) {
-      return const ApiReply(200, '{"access_token":"fake-jwt","token_type":"bearer","expires_in":3600}');
+      return const ApiReply(
+        200,
+        '{"access_token":"fake-jwt","token_type":"bearer","expires_in":3600}',
+      );
     }
     if (uri.path.endsWith('/me')) {
-      return const ApiReply(200, '{"id":"11111111-1111-4111-8111-111111111111","full_name":"Student User","email":"student@example.edu","university_id":"S-001","account_type":"student","is_active":true,"created_at":"2026-11-24T12:00:00Z"}');
+      return const ApiReply(
+        200,
+        '{"id":"11111111-1111-4111-8111-111111111111","full_name":"Student User","email":"student@example.edu","university_id":"S-001","account_type":"student","is_active":true,"created_at":"2026-11-24T12:00:00Z"}',
+      );
     }
     if (uri.path.endsWith('/logout')) return const ApiReply(204, '');
     if (uri.path == '/api/v1/clubs') {
-      if (browseFails) return const ApiReply(503, '{"detail":"Database unavailable"}');
-      if (empty) return const ApiReply(200, '{"clubs":[],"page":1,"page_size":20,"total":0}');
-      return const ApiReply(200, '{"clubs":[{"id":"22222222-2222-4222-8222-222222222222","name":"Mock Campus Engineering Club","description":"Backend returned club","category":"Academic","logo_url":null}],"page":1,"page_size":20,"total":1}');
+      if (browseFails)
+        return const ApiReply(503, '{"detail":"Database unavailable"}');
+      if (empty)
+        return const ApiReply(
+          200,
+          '{"clubs":[],"page":1,"page_size":20,"total":0}',
+        );
+      return const ApiReply(
+        200,
+        '{"clubs":[{"id":"22222222-2222-4222-8222-222222222222","name":"Mock Campus Engineering Club","description":"Backend returned club","category":"Academic","logo_url":null}],"page":1,"page_size":20,"total":1}',
+      );
     }
     if (uri.path.startsWith('/api/v1/clubs/')) {
-      return const ApiReply(200, '{"club":{"id":"22222222-2222-4222-8222-222222222222","name":"Mock Campus Engineering Club","description":"Backend returned club","category":"Academic","logo_url":null},"events":[{"id":"33333333-3333-4333-8333-333333333333","title":"Published Event From API","description":"Approved by Student Affairs","venue":"Main Hall","starts_at":"2030-05-10T12:00:00+00:00","ends_at":null,"seat_capacity":50}],"page":1,"page_size":20,"total":1}');
+      return const ApiReply(
+        200,
+        '{"club":{"id":"22222222-2222-4222-8222-222222222222","name":"Mock Campus Engineering Club","description":"Backend returned club","category":"Academic","logo_url":null},"events":[{"id":"33333333-3333-4333-8333-333333333333","title":"Published Event From API","description":"Approved by Student Affairs","venue":"Main Hall","starts_at":"2030-05-10T12:00:00+00:00","ends_at":null,"seat_capacity":50}],"page":1,"page_size":20,"total":1}',
+      );
     }
     return const ApiReply(404, '{"detail":"Not found"}');
   }
 }
 
-CampusConnectApp _app(_MockTransport transport, _MemoryStore store) => CampusConnectApp(
-      api: CampusApi(transport: transport, baseUri: Uri.parse('http://10.0.2.2:8000')),
+CampusConnectApp _app(_MockTransport transport, _MemoryStore store) =>
+    CampusConnectApp(
+      api: CampusApi(
+        transport: transport,
+        baseUri: Uri.parse('http://10.0.2.2:8000'),
+      ),
       tokenStore: store,
     );
 
@@ -73,17 +98,21 @@ Future<void> _login(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('open-auth')));
   await tester.pumpAndSettle();
   await tester.enterText(
-    find.byKey(const ValueKey('auth-email')), 'student@example.edu',
+    find.byKey(const ValueKey('auth-email')),
+    'student@example.edu',
   );
   await tester.enterText(
-    find.byKey(const ValueKey('auth-password')), 'StrongPassphrase#123',
+    find.byKey(const ValueKey('auth-password')),
+    'StrongPassphrase#123',
   );
   await tester.tap(find.byKey(const ValueKey('auth-submit')));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('welcome navigates to real sign-in, not placeholder', (tester) async {
+  testWidgets('welcome navigates to real sign-in, not placeholder', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app(_MockTransport(), _MemoryStore()));
     await tester.pumpAndSettle();
     expect(find.text('Your campus community starts here.'), findsOneWidget);
@@ -93,7 +122,9 @@ void main() {
     expect(find.text('Sign in'), findsWidgets);
   });
 
-  testWidgets('register leads to login, clubs, details, profile and logout', (tester) async {
+  testWidgets('register leads to login, clubs, details, profile and logout', (
+    tester,
+  ) async {
     final backend = _MockTransport();
     final store = _MemoryStore();
     await tester.pumpWidget(_app(backend, store));
@@ -104,23 +135,43 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('auth-toggle')));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const ValueKey('register-name')), 'Student User');
-    await tester.enterText(find.byKey(const ValueKey('auth-email')), 'student@example.edu');
-    await tester.enterText(find.byKey(const ValueKey('register-university-id')), 'S-001');
-    await tester.enterText(find.byKey(const ValueKey('auth-password')), 'StrongPassphrase#123');
-    await tester.enterText(find.byKey(const ValueKey('register-confirm-password')), 'StrongPassphrase#123');
+    await tester.enterText(
+      find.byKey(const ValueKey('register-name')),
+      'Student User',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email')),
+      'student@example.edu',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('register-university-id')),
+      'S-001',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password')),
+      'StrongPassphrase#123',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('register-confirm-password')),
+      'StrongPassphrase#123',
+    );
     await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
     await tester.tap(find.byKey(const ValueKey('auth-submit')));
     await tester.pumpAndSettle();
 
-    expect(backend.paths.indexOf('/api/v1/auth/register'),
-        lessThan(backend.paths.indexOf('/api/v1/auth/login')));
+    expect(
+      backend.paths.indexOf('/api/v1/auth/register'),
+      lessThan(backend.paths.indexOf('/api/v1/auth/login')),
+    );
     expect(store.token, 'fake-jwt');
     expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
     await tester.tap(find.text('Mock Campus Engineering Club'));
     await tester.pumpAndSettle();
     expect(find.text('Published Event From API'), findsOneWidget);
-    expect(find.text('No upcoming published events for this club.'), findsNothing);
+    expect(
+      find.text('No upcoming published events for this club.'),
+      findsNothing,
+    );
 
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -134,16 +185,26 @@ void main() {
     expect(find.text('Your campus community starts here.'), findsOneWidget);
   });
 
-  testWidgets('empty server result is clearly different from fabricated clubs', (tester) async {
-    await tester.pumpWidget(_app(_MockTransport(empty: true), _MemoryStore()));
-    await tester.pumpAndSettle();
-    await _login(tester);
-    expect(find.text('No approved active clubs are available yet.'), findsOneWidget);
-    expect(find.text('Robotics Club'), findsNothing);
-  });
+  testWidgets(
+    'empty server result is clearly different from fabricated clubs',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(_MockTransport(empty: true), _MemoryStore()),
+      );
+      await tester.pumpAndSettle();
+      await _login(tester);
+      expect(
+        find.text('No approved active clubs are available yet.'),
+        findsOneWidget,
+      );
+      expect(find.text('Robotics Club'), findsNothing);
+    },
+  );
 
   testWidgets('API failures show an explicit retry state', (tester) async {
-    await tester.pumpWidget(_app(_MockTransport(browseFails: true), _MemoryStore()));
+    await tester.pumpWidget(
+      _app(_MockTransport(browseFails: true), _MemoryStore()),
+    );
     await tester.pumpAndSettle();
     await _login(tester);
     expect(find.text('Database unavailable'), findsOneWidget);
