@@ -650,14 +650,15 @@ def test_club_search_filters_before_pagination(auth_client, migrated_engine):
 
 
 def test_club_search_validates_bounds_and_enforces_authorization(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
     invalid_search = auth_client.get(
-        "/api/v1/clubs", headers=_student_access_headers(auth_client),
+        "/api/v1/clubs", headers=headers,
         params={"search": "x" * 121},
     )
     assert invalid_search.status_code == 422
     invalid_category = auth_client.get(
         "/api/v1/clubs",
-        headers=_student_access_headers(auth_client),
+        headers=headers,
         params={"category": "x" * 81},
     )
     assert invalid_category.status_code == 422
