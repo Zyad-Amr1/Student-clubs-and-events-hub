@@ -224,8 +224,7 @@ class CampusApi {
     JsonObject? body,
     Map<String, String>? query,
   }) async {
-    if (baseUri.host.isEmpty ||
-        !{'http', 'https'}.contains(baseUri.scheme)) {
+    if (baseUri.host.isEmpty || !{'http', 'https'}.contains(baseUri.scheme)) {
       throw const ApiFailure('Configure a valid HTTP(S) API_BASE_URL.');
     }
     // dart:io HttpClient is not governed by Android's network security XML.
