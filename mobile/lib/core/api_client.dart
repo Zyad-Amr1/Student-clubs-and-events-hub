@@ -47,6 +47,8 @@ class IoApiTransport implements ApiTransport {
       final request = await client
           .openUrl(method, uri)
           .timeout(const Duration(seconds: 12));
+      // Do not follow redirects that could send credentials to another host.
+      request.followRedirects = false;
       headers.forEach(request.headers.set);
       if (body != null) {
         request.write(body);
@@ -223,9 +225,16 @@ class CampusApi {
     Map<String, String>? query,
   }) async {
     if (baseUri.host.isEmpty ||
-        !{'http', 'https'}.contains(baseUri.scheme) ||
-        (kReleaseMode && baseUri.scheme != 'https')) {
-      throw const ApiFailure('Configure an HTTPS API_BASE_URL for release.');
+        !{'http', 'https'}.contains(baseUri.scheme)) {
+      throw const ApiFailure('Configure a valid HTTP(S) API_BASE_URL.');
+    }
+    // dart:io HttpClient is not governed by Android's network security XML.
+    // Only the Android Emulator host bridge may use plaintext HTTP.
+    if (baseUri.scheme == 'http' &&
+        (kReleaseMode || baseUri.host != '10.0.2.2')) {
+      throw const ApiFailure(
+        'HTTP is allowed only for Android Emulator at 10.0.2.2 in development. Use HTTPS elsewhere.',
+      );
     }
     final uri = baseUri.replace(
       path: '${baseUri.path.replaceFirst(RegExp(r"/$"), "")}$path',
