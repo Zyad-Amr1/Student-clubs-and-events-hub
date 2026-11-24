@@ -112,6 +112,7 @@ async def _reject_submit_body(request: Request) -> None:
 @router.post(
     "/{club_id}/events/{event_id}/submit",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(_reject_submit_body)],
     response_model=DraftEventResponse,
     summary="Submit an unpublished draft event for Student Affairs approval",
     responses={
