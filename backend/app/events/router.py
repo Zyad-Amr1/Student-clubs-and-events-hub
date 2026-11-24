@@ -1,5 +1,6 @@
 """Draft creation requires a verified Student with a club-specific DB grant."""
 
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -66,6 +67,94 @@ def create_draft_event(
         is_published=False,
     )
     db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def _ensure_ready_to_submit(event: Event) -> None:
+    """Validate a persisted draft, not client-supplied state, at submit time."""
+    schedule_invalid = (
+        event.starts_at.tzinfo is None
+        or event.starts_at.utcoffset() is None
+        or event.starts_at <= datetime.now(timezone.utc)
+        or (
+            event.ends_at is not None
+            and (
+                event.ends_at.tzinfo is None
+                or event.ends_at.utcoffset() is None
+                or event.ends_at <= event.starts_at
+            )
+        )
+    )
+    content_invalid = (
+        not event.title.strip()
+        or len(event.title) > 160
+        or not event.description.strip()
+        or len(event.description) > 10_000
+        or not event.venue.strip()
+        or len(event.venue) > 200
+        or not isinstance(event.seat_capacity, int)
+        or not 1 <= event.seat_capacity <= 100_000
+    )
+    if schedule_invalid or content_invalid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Draft event has invalid details or a past start time",
+        )
+
+
+@router.post(
+    "/{club_id}/events/{event_id}/submit",
+    status_code=status.HTTP_200_OK,
+    response_model=DraftEventResponse,
+    summary="Submit an unpublished draft event for Student Affairs approval",
+    responses={
+        401: {"description": "Missing or invalid bearer session"},
+        403: {"description": "Student account required; no Student Affairs override"},
+        404: {"description": "Club or draft event not found or access denied"},
+        409: {"description": "Event is not an unpublished draft"},
+        422: {"description": "Invalid event identifiers or draft is not ready"},
+    },
+)
+def submit_draft_event(
+    club_id: Annotated[UUID, Path(description="Club UUID")],
+    event_id: Annotated[UUID, Path(description="Event UUID")],
+    identity: Annotated[AuthenticatedIdentity, Depends(current_identity)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Event:
+    """Atomically transition draft -> pending with club-scoped authorization.
+
+    Lock the club, membership, and event in the same transaction. A second
+    concurrent request will observe the committed pending state and get 409.
+    All unauthorized resource combinations return the same 404.
+    """
+    if identity.user.account_type != AccountType.STUDENT:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    event = db.scalar(
+        select(Event)
+        .join(Club, Event.club_id == Club.id)
+        .join(ClubAdministrator, ClubAdministrator.club_id == Club.id)
+        .where(
+            Club.id == club_id,
+            Club.is_active.is_(True),
+            ClubAdministrator.user_id == identity.user.id,
+            Event.club_id == club_id,
+            Event.id == event_id,
+        )
+        .with_for_update(of=(Club, ClubAdministrator, Event))
+    )
+    if event is None:
+        raise HTTPException(status_code=404, detail="Club or event not found")
+
+    if event.approval_status != EventApprovalStatus.DRAFT or event.is_published:
+        raise HTTPException(status_code=409, detail="Event is not an unpublished draft")
+
+    _ensure_ready_to_submit(event)
+
+    event.approval_status = EventApprovalStatus.PENDING
+    event.is_published = False
     db.commit()
     db.refresh(event)
     return event
