@@ -13,6 +13,9 @@ class ClubsScreen extends StatefulWidget {
 
 class _ClubsScreenState extends State<ClubsScreen> {
   final List<CampusClub> _clubs = [];
+  final TextEditingController _searchController = TextEditingController();
+  final Set<String> _categories = {};
+  String _category = '';
   int _page = 1;
   int _total = 0;
   bool _loading = true;
@@ -23,6 +26,21 @@ class _ClubsScreenState extends State<ClubsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load(reset: true));
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<CampusClub> get _visibleClubs {
+    final term = _searchController.text.trim().toLowerCase();
+    return _clubs.where((club) {
+      final nameMatches = term.isEmpty || club.name.toLowerCase().contains(term);
+      final categoryMatches = _category.isEmpty || club.category == _category;
+      return nameMatches && categoryMatches;
+    }).toList(growable: false);
   }
 
   Future<void> _load({bool reset = false}) async {
@@ -49,6 +67,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
       if (!mounted) return;
       setState(() {
         _clubs.addAll(result.clubs);
+        _categories.addAll(result.clubs.map((club) => club.category));
         _total = result.total;
         _page++;
       });
@@ -95,6 +114,54 @@ class _ClubsScreenState extends State<ClubsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Discover clubs'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(168),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Column(
+              children: [
+                TextField(
+                  key: const ValueKey('club-search'),
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Search loaded clubs',
+                    prefixIcon: Icon(Icons.search),
+                    counterText: '',
+                  ),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('club-category-filter'),
+                  initialValue: _category,
+                  decoration: const InputDecoration(
+                    labelText: 'Category in loaded clubs',
+                    prefixIcon: Icon(Icons.filter_list),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('All categories'),
+                    ),
+                    for (final category in (_categories.toList()..sort()))
+                      DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _category = value ?? '');
+                  },
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Filters cover loaded results; load more for other clubs.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             key: const ValueKey('open-profile'),
@@ -114,6 +181,21 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 message: 'No approved active clubs are available yet.',
                 onRetry: () => _load(reset: true),
               )
+            : _visibleClubs.isEmpty
+            ? _MessageState(
+                message: 'No matching clubs among the loaded results.',
+                onRetry: _clubs.length < _total
+                    ? () => _load()
+                    : () {
+                        setState(() {
+                          _searchController.clear();
+                          _category = '';
+                        });
+                      },
+                actionLabel: _clubs.length < _total
+                    ? 'Load more clubs'
+                    : 'Clear filters',
+              )
             : RefreshIndicator(
                 onRefresh: () => _load(reset: true),
                 child: ListView.builder(
@@ -121,10 +203,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount:
-                      _clubs.length +
+                      _visibleClubs.length +
                       (_clubs.length < _total || _error != null ? 1 : 0),
                   itemBuilder: (context, index) {
-                    if (index == _clubs.length) {
+                    if (index == _visibleClubs.length) {
                       return Padding(
                         padding: const EdgeInsets.all(12),
                         child: _error != null
@@ -154,7 +236,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                               ),
                       );
                     }
-                    final club = _clubs[index];
+                    final club = _visibleClubs[index];
                     return Card(
                       child: ListTile(
                         key: ValueKey('club-${club.id}'),
@@ -182,10 +264,11 @@ class _ClubsScreenState extends State<ClubsScreen> {
 }
 
 class _MessageState extends StatelessWidget {
-  const _MessageState({required this.message, required this.onRetry});
+  const _MessageState({required this.message, required this.onRetry, this.actionLabel = 'Refresh'});
 
   final String message;
   final VoidCallback onRetry;
+  final String actionLabel;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -201,7 +284,7 @@ class _MessageState extends StatelessWidget {
           OutlinedButton(
             key: const ValueKey('retry-clubs'),
             onPressed: onRetry,
-            child: const Text('Refresh'),
+            child: Text(actionLabel),
           ),
         ],
       ),
