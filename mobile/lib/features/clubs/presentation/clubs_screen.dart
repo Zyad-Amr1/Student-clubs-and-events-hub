@@ -36,11 +36,15 @@ class _ClubsScreenState extends State<ClubsScreen> {
 
   List<CampusClub> get _visibleClubs {
     final term = _searchController.text.trim().toLowerCase();
-    return _clubs.where((club) {
-      final nameMatches = term.isEmpty || club.name.toLowerCase().contains(term);
-      final categoryMatches = _category.isEmpty || club.category == _category;
-      return nameMatches && categoryMatches;
-    }).toList(growable: false);
+    return _clubs
+        .where((club) {
+          final nameMatches =
+              term.isEmpty || club.name.toLowerCase().contains(term);
+          final categoryMatches =
+              _category.isEmpty || club.category == _category;
+          return nameMatches && categoryMatches;
+        })
+        .toList(growable: false);
   }
 
   Future<void> _load({bool reset = false}) async {
@@ -144,10 +148,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       child: Text('All categories'),
                     ),
                     for (final category in (_categories.toList()..sort()))
-                      DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      ),
+                      DropdownMenuItem(value: category, child: Text(category)),
                   ],
                   onChanged: (value) {
                     setState(() => _category = value ?? '');
@@ -264,7 +265,11 @@ class _ClubsScreenState extends State<ClubsScreen> {
 }
 
 class _MessageState extends StatelessWidget {
-  const _MessageState({required this.message, required this.onRetry, this.actionLabel = 'Refresh'});
+  const _MessageState({
+    required this.message,
+    required this.onRetry,
+    this.actionLabel = 'Refresh',
+  });
 
   final String message;
   final VoidCallback onRetry;
