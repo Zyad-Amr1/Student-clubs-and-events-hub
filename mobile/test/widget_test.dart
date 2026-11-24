@@ -11,9 +11,13 @@ class _MemoryStore implements TokenStore {
   @override
   Future<String?> read() async => token;
   @override
-  Future<void> write(String value) async => token = value;
+  Future<void> write(String value) async {
+    token = value;
+  }
   @override
-  Future<void> clear() async => token = null;
+  Future<void> clear() async {
+    token = null;
+  }
 }
 
 class _MockTransport implements ApiTransport {
