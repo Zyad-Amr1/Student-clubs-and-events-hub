@@ -514,6 +514,180 @@ def test_student_browses_only_approved_active_clubs(auth_client, migrated_engine
     )
 
 
+
+
+def test_club_search_and_category_filter_only_public_clubs(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name="Aero Robotics", description="Aero", category="TECHNOLOGY",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Robotics Society", description="Robotics", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Robot Academy", description="Academy", category="Academic",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Arts Collective", description="Arts", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Pending Robotics", description="Hidden pending", category="Technology",
+                     approval_status=ClubApprovalStatus.PENDING, is_active=True),
+                Club(name="Rejected Robotics", description="Hidden rejected", category="Technology",
+                     approval_status=ClubApprovalStatus.REJECTED, is_active=True),
+                Club(name="Inactive Robotics", description="Hidden inactive", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=False),
+            ]
+        )
+        session.commit()
+
+    search = auth_client.get("/api/v1/clubs", headers=headers, params={"search": "  rObOt  "})
+    assert search.status_code == 200, search.text
+    assert search.json()["total"] == 3
+    assert [club["name"] for club in search.json()["clubs"]] == [
+        "Aero Robotics", "Robot Academy", "Robotics Society"
+    ]
+
+    category = auth_client.get("/api/v1/clubs", headers=headers, params={"category": "  technology  "})
+    assert category.status_code == 200, category.text
+    assert category.json()["total"] == 2
+    assert [club["name"] for club in category.json()["clubs"]] == [
+        "Aero Robotics", "Robotics Society"
+    ]
+
+    combined = auth_client.get(
+        "/api/v1/clubs",
+        headers=headers,
+        params={"search": " ROBOT ", "category": " TeChNoLoGy "},
+    )
+    assert combined.status_code == 200, combined.text
+    assert combined.json()["total"] == 2
+    assert [club["name"] for club in combined.json()["clubs"]] == [
+        "Aero Robotics", "Robotics Society"
+    ]
+    assert set(combined.json()["clubs"][0]) == {
+        "id", "name", "description", "category", "logo_url"
+    }
+    assert all(hidden not in combined.text for hidden in (
+        "Pending Robotics", "Rejected Robotics", "Inactive Robotics",
+    ))
+
+    exact_category = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"category": "tech"}
+    )
+    assert exact_category.status_code == 200
+    assert exact_category.json()["total"] == 0
+    assert exact_category.json()["clubs"] == []
+
+    blank_filters = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "   ", "category": "  "}
+    )
+    assert blank_filters.status_code == 200
+    assert blank_filters.json()["total"] == 4
+
+
+def test_club_search_treats_wildcards_as_literal_text(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name="100% Robotics", description="Percent", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="100X Robotics", description="Another", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="A_B Club", description="Underscore", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="AxB Club", description="Another", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED),
+            ]
+        )
+        session.commit()
+
+    percent = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "100%"}
+    )
+    underscore = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "A_B"}
+    )
+    assert percent.status_code == underscore.status_code == 200
+    assert [club["name"] for club in percent.json()["clubs"]] == ["100% Robotics"]
+    assert [club["name"] for club in underscore.json()["clubs"]] == ["A_B Club"]
+
+
+def test_club_search_filters_before_pagination(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name=name, description=name, category=category,
+                     approval_status=ClubApprovalStatus.APPROVED)
+                for name, category in (
+                    ("Alpha Robotics", "Technology"),
+                    ("Beta Robotics", "Technology"),
+                    ("Gamma Robotics", "Technology"),
+                    ("Arts Club", "Technology"),
+                    ("Robotics Academy", "Academic"),
+                )
+            ]
+        )
+        session.commit()
+
+    first = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 1, "page_size": 1},
+    )
+    second = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 2, "page_size": 1},
+    )
+    empty = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 4, "page_size": 1},
+    )
+    assert first.status_code == second.status_code == empty.status_code == 200
+    assert first.json()["total"] == second.json()["total"] == empty.json()["total"] == 3
+    assert [c["name"] for c in first.json()["clubs"]] == ["Alpha Robotics"]
+    assert [c["name"] for c in second.json()["clubs"]] == ["Beta Robotics"]
+    assert empty.json()["clubs"] == []
+
+
+def test_club_search_validates_bounds_and_enforces_authorization(auth_client, migrated_engine):
+    invalid_search = auth_client.get(
+        "/api/v1/clubs", headers=_student_access_headers(auth_client),
+        params={"search": "x" * 121},
+    )
+    assert invalid_search.status_code == 422
+    invalid_category = auth_client.get(
+        "/api/v1/clubs",
+        headers=_student_access_headers(auth_client),
+        params={"category": "x" * 81},
+    )
+    assert invalid_category.status_code == 422
+    missing_auth = auth_client.get(
+        "/api/v1/clubs", params={"search": "Robotics", "category": "Technology"}
+    )
+    assert missing_auth.status_code == 401
+
+    with Session(migrated_engine) as session:
+        session.add(User(
+            full_name="Search Affairs Officer",
+            email="search-affairs@example.edu",
+            university_id="SEARCH-AFFAIRS-01",
+            password_hash=hash_password("SyntheticAffairsPassword123!"),
+            account_type=AccountType.STUDENT_AFFAIRS,
+        ))
+        session.commit()
+    login = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "search-affairs@example.edu", "password": "SyntheticAffairsPassword123!"},
+    )
+    assert login.status_code == 200
+    affairs = auth_client.get(
+        "/api/v1/clubs",
+        headers=access_headers(login.json()["access_token"]),
+        params={"search": "Robotics", "category": "Technology"},
+    )
+    assert affairs.status_code == 403
+
+
 def test_club_timestamps_are_database_managed(migrated_engine, registration_client):
     with Session(migrated_engine) as session:
         club = Club(
