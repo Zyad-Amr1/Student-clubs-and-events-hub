@@ -39,13 +39,17 @@ cd backend
 ```
 
 The emulator uses `10.0.2.2` to reach the host computer. A physical Android
-device needs a reachable URL, such as the developer computer's LAN address,
-and a deliberately configured network policy; the debug Android manifest
-permits cleartext HTTP for emulator loopback only. Use HTTPS elsewhere.
+device needs a reachable **HTTPS** URL. Plaintext LAN IP addresses are
+not allowed by the Flutter client; do not use them for registration or login.
 
-The release variant requires an HTTPS `API_BASE_URL`. Internet permission
-is in the main manifest. Debug-only cleartext permission is limited to
-`10.0.2.2`. Android Keystore encrypts session tokens (AES/GCM) before they
+The Dart `HttpClient` does **not** rely on the Android network security XML
+to enforce its cleartext policy. The Flutter API client itself permits HTTP
+only when the host is exactly `10.0.2.2` and the build is non-release.
+It rejects other HTTP hosts before sending any request, and disables HTTP
+redirect following. Release builds require HTTPS. The debug Android network
+policy also permits only the emulator bridge. Internet permission
+is in the main manifest. Android Keystore encrypts session tokens
+(AES/GCM) before they
 are persisted; Android backup is disabled to avoid restoring encrypted data
 without its Keystore key.
 
