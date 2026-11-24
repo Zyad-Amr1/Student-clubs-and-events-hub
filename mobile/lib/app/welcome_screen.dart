@@ -1,5 +1,5 @@
 import 'package:campusconnect/app/routes.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -53,7 +53,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Meet people, explore interests, and find events happening across your university.',
+                'Create a student account, discover clubs, and see approved upcoming events.',
                 style: textTheme.bodyLarge?.copyWith(
                   color: colors.onSurfaceVariant,
                   height: 1.5,
@@ -62,31 +62,15 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 28),
               Card(
                 color: colors.surfaceContainerLow,
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
+                child: const Padding(
+                  padding: EdgeInsets.all(18),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.explore_outlined, color: colors.primary),
-                      const SizedBox(width: 14),
+                      Icon(Icons.verified_user_outlined),
+                      SizedBox(width: 14),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'A place for every interest',
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Live club data is not connected yet.',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Club information is loaded from the university backend after sign-in.',
                         ),
                       ),
                     ],
@@ -110,18 +94,9 @@ class WelcomeScreen extends StatelessWidget {
                 child: OutlinedButton.icon(
                   key: const ValueKey<String>('open-clubs'),
                   onPressed: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.clubs),
+                      Navigator.of(context).pushNamed(AppRoutes.authentication),
                   icon: const Icon(Icons.groups_outlined),
-                  label: const Text('Club discovery'),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Center(
-                child: Text(
-                  'A student clubs and events hub',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
+                  label: const Text('Sign in to explore clubs'),
                 ),
               ),
             ],
