@@ -73,21 +73,24 @@ def create_draft_event(
 
 
 def _ensure_ready_to_submit(event: Event) -> None:
-    """Validate a persisted draft, not client-supplied state, at submit time."""
-    schedule_invalid = (
-        event.starts_at.tzinfo is None
-        or event.starts_at.utcoffset() is None
-        or event.starts_at <= datetime.now(timezone.utc)
-        or (
-            event.ends_at is not None
-            and (
-                event.ends_at.tzinfo is None
-                or event.ends_at.utcoffset() is None
-                or event.ends_at <= event.starts_at
-            )
-        )
-    )
-    content_invalid = (
+    """Recheck persisted draft readiness at transition time, not creation time."""
+    start = event.starts_at
+    if (
+        start.tzinfo is None
+        or start.utcoffset() is None
+        or start <= datetime.now(timezone.utc)
+    ):
+        raise HTTPException(status_code=422, detail="Event start must be in the future")
+
+    end = event.ends_at
+    if end is not None and (
+        end.tzinfo is None
+        or end.utcoffset() is None
+        or end <= start
+    ):
+        raise HTTPException(status_code=422, detail="Event end must be after start")
+
+    if (
         not event.title.strip()
         or len(event.title) > 160
         or not event.description.strip()
@@ -96,12 +99,8 @@ def _ensure_ready_to_submit(event: Event) -> None:
         or len(event.venue) > 200
         or not isinstance(event.seat_capacity, int)
         or not 1 <= event.seat_capacity <= 100_000
-    )
-    if schedule_invalid or content_invalid:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Draft event has invalid details or a past start time",
-        )
+    ):
+        raise HTTPException(status_code=422, detail="Draft event details are invalid")
 
 
 @router.post(

@@ -119,6 +119,55 @@ def test_cross_club_submission_is_indistinguishable_from_missing_event(
     assert state(draft_test_engine, owned_draft["id"]).approval_status == "draft"
 
 
+
+def test_revoked_other_club_membership_does_not_authorize_submission(
+    draft_client, draft_test_engine, scenario, owned_draft
+):
+    ids = scenario["ids"]
+    grant_admin(draft_test_engine, ids["other"], ids["owner"])
+    created = draft_client.post(
+        f"/api/v1/clubs/{ids['other']}/events",
+        json=payload(),
+        headers=scenario["headers"]["owner"],
+    )
+    assert created.status_code == 201, created.text
+    other_id = created.json()["id"]
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text(
+                "DELETE FROM club_administrators "
+                "WHERE club_id=:club AND user_id=:user"
+            ),
+            {"club": ids["other"], "user": ids["owner"]},
+        )
+    response = submit(
+        draft_client, ids["other"], other_id,
+        scenario["headers"]["owner"],
+    )
+    assert response.status_code == 404
+    assert state(draft_test_engine, other_id).approval_status == "draft"
+    assert state(draft_test_engine, owned_draft["id"]).approval_status == "draft"
+
+
+def test_published_draft_cannot_be_submitted(
+    draft_client, draft_test_engine, scenario, owned_draft
+):
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text("UPDATE events SET is_published=true WHERE id=:id"),
+            {"id": owned_draft["id"]},
+        )
+    result = submit(
+        draft_client, scenario["ids"]["club"], owned_draft["id"],
+        scenario["headers"]["owner"],
+    )
+    assert result.status_code == 409
+    current = state(draft_test_engine, owned_draft["id"])
+    assert current.approval_status == "draft"
+    assert current.is_published is True
+    assert_nonpublic(draft_client, scenario, owned_draft["id"])
+
+
 def test_student_without_club_grant_cannot_submit(
     draft_client, draft_test_engine, scenario, owned_draft
 ):
