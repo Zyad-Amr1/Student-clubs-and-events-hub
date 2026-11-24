@@ -1,79 +1,21 @@
-import os
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 import jwt
-from fastapi.testclient import TestClient
 
 from app.auth.accounts import DuplicateAccountError, create_account
 from app.auth.passwords import hash_password, verify_password
 from app.auth.schemas import AccountCreationInput
 from app.auth.tokens import JWT_AUDIENCE, JWT_ISSUER
 from app.config import get_jwt_secret
-from app.database import get_db
-from app.main import app
 from app.models.club import Club, ClubApprovalStatus
 from app.models.event import Event, EventApprovalStatus
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import URL, create_engine, inspect, text
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.user import AccountType, User
-
-
-@pytest.fixture(scope="module")
-def migrated_engine():
-    port = os.getenv("CAMPUSCONNECT_AUTH_TEST_PG_PORT")
-    if port is None:
-        if os.getenv("GITHUB_ACTIONS") == "true":
-            pytest.fail("GitHub Actions must configure its disposable PostgreSQL service")
-        pytest.skip("Set CAMPUSCONNECT_AUTH_TEST_PG_PORT for a disposable PostgreSQL instance")
-    if not port.isdecimal() or not 1024 <= int(port) <= 65535 or int(port) == 5432:
-        pytest.fail("Use a separate PostgreSQL instance on a non-default test port")
-
-    url = URL.create(
-        "postgresql+psycopg",
-        username="postgres",
-        host="127.0.0.1",
-        port=int(port),
-        database="campusconnect_auth_test",
-    )
-    engine = create_engine(url, connect_args={"connect_timeout": 3}, hide_parameters=True)
-    alembic_config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    try:
-        if inspect(engine).get_table_names():
-            pytest.fail("The disposable PostgreSQL database must be empty")
-        with pytest.MonkeyPatch.context() as patch:
-            patch.setattr("app.config.get_database_url", lambda: url)
-            command.upgrade(alembic_config, "head")
-            try:
-                assert inspect(engine).has_table("clubs")
-                assert inspect(engine).has_table("events")
-                command.check(alembic_config)
-                yield engine
-            finally:
-                command.downgrade(alembic_config, "base")
-                with engine.begin() as connection:
-                    assert not inspect(connection).has_table("users")
-                    assert not inspect(connection).has_table("clubs")
-                    assert not inspect(connection).has_table("events")
-                    assert connection.scalar(text(
-                        "SELECT to_regprocedure('campusconnect_users_before_update()')"
-                    )) is None
-                    assert connection.scalar(text(
-                        "SELECT to_regprocedure('campusconnect_clubs_before_update()')"
-                    )) is None
-                    assert connection.scalar(text(
-                        "SELECT to_regprocedure('campusconnect_events_before_update()')"
-                    )) is None
-                    # The fixture started with an empty database and owns this table.
-                    connection.execute(text("DROP TABLE alembic_version"))
-    finally:
-        engine.dispose()
 
 
 def new_user(email="Student@Example.EDU", university_id=" id-01 "):
@@ -211,29 +153,6 @@ def test_postgresql_rejects_noncanonical_direct_values(migrated_engine, field, v
         assert error.value.orig.diag.constraint_name == constraint
 
 
-@pytest.fixture
-def registration_client(migrated_engine):
-    """Route requests to the disposable PostgreSQL database; clean up committed rows."""
-    def isolated_session():
-        with Session(migrated_engine) as session:
-            yield session
-
-    previous = app.dependency_overrides.get(get_db)
-    app.dependency_overrides[get_db] = isolated_session
-    try:
-        with TestClient(app) as client:
-            yield client
-    finally:
-        if previous is None:
-            app.dependency_overrides.pop(get_db, None)
-        else:
-            app.dependency_overrides[get_db] = previous
-        with migrated_engine.begin() as connection:
-            connection.execute(text("DELETE FROM events"))
-            connection.execute(text("DELETE FROM clubs"))
-            connection.execute(text("DELETE FROM users"))
-
-
 def registration_body(**changes):
     return {
         "full_name": "  Example Student  ",
@@ -297,12 +216,6 @@ def test_registration_errors_do_not_echo_submitted_secrets(registration_client, 
 
 # Login, JWT authorization, and server-side logout integration tests.
 # These always run on the disposable PostgreSQL test instance from migrated_engine.
-
-@pytest.fixture
-def auth_client(registration_client, monkeypatch):
-    monkeypatch.setenv("JWT_SECRET_KEY", "only-for-tests-0123456789-abcdefghijklmnopqrstuv")
-    return registration_client
-
 
 def login_body(**changes):
     return {"email": " STUDENT@EXAMPLE.EDU ", "password": "StrongPassphrase#123", **changes}
@@ -512,6 +425,179 @@ def test_student_browses_only_approved_active_clubs(auth_client, migrated_engine
         hidden_name not in response.text
         for hidden_name in ("Pending Club", "Rejected Club", "Inactive Club")
     )
+
+
+def test_club_search_and_category_filter_only_public_clubs(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name="Aero Robotics", description="Aero", category="TECHNOLOGY",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Robotics Society", description="Robotics", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Robot Academy", description="Academy", category="Academic",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Arts Collective", description="Arts", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=True),
+                Club(name="Pending Robotics", description="Hidden pending", category="Technology",
+                     approval_status=ClubApprovalStatus.PENDING, is_active=True),
+                Club(name="Rejected Robotics", description="Hidden rejected", category="Technology",
+                     approval_status=ClubApprovalStatus.REJECTED, is_active=True),
+                Club(name="Inactive Robotics", description="Hidden inactive", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED, is_active=False),
+            ]
+        )
+        session.commit()
+
+    search = auth_client.get("/api/v1/clubs", headers=headers, params={"search": "  rObOt  "})
+    assert search.status_code == 200, search.text
+    assert search.json()["total"] == 3
+    assert [club["name"] for club in search.json()["clubs"]] == [
+        "Aero Robotics", "Robot Academy", "Robotics Society"
+    ]
+
+    category = auth_client.get("/api/v1/clubs", headers=headers, params={"category": "  technology  "})
+    assert category.status_code == 200, category.text
+    assert category.json()["total"] == 2
+    assert [club["name"] for club in category.json()["clubs"]] == [
+        "Aero Robotics", "Robotics Society"
+    ]
+
+    combined = auth_client.get(
+        "/api/v1/clubs",
+        headers=headers,
+        params={"search": " ROBOT ", "category": " TeChNoLoGy "},
+    )
+    assert combined.status_code == 200, combined.text
+    assert combined.json()["total"] == 2
+    assert [club["name"] for club in combined.json()["clubs"]] == [
+        "Aero Robotics", "Robotics Society"
+    ]
+    assert set(combined.json()["clubs"][0]) == {
+        "id", "name", "description", "category", "logo_url"
+    }
+    assert all(hidden not in combined.text for hidden in (
+        "Pending Robotics", "Rejected Robotics", "Inactive Robotics",
+    ))
+
+    exact_category = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"category": "tech"}
+    )
+    assert exact_category.status_code == 200
+    assert exact_category.json()["total"] == 0
+    assert exact_category.json()["clubs"] == []
+
+    blank_filters = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "   ", "category": "  "}
+    )
+    assert blank_filters.status_code == 200
+    assert blank_filters.json()["total"] == 4
+
+
+def test_club_search_treats_wildcards_as_literal_text(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name="100% Robotics", description="Percent", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="100X Robotics", description="Another", category="Technology",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="A_B Club", description="Underscore", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED),
+                Club(name="AxB Club", description="Another", category="Arts",
+                     approval_status=ClubApprovalStatus.APPROVED),
+            ]
+        )
+        session.commit()
+
+    percent = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "100%"}
+    )
+    underscore = auth_client.get(
+        "/api/v1/clubs", headers=headers, params={"search": "A_B"}
+    )
+    assert percent.status_code == underscore.status_code == 200
+    assert [club["name"] for club in percent.json()["clubs"]] == ["100% Robotics"]
+    assert [club["name"] for club in underscore.json()["clubs"]] == ["A_B Club"]
+
+
+def test_club_search_filters_before_pagination(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    with Session(migrated_engine) as session:
+        session.add_all(
+            [
+                Club(name=name, description=name, category=category,
+                     approval_status=ClubApprovalStatus.APPROVED)
+                for name, category in (
+                    ("Alpha Robotics", "Technology"),
+                    ("Beta Robotics", "Technology"),
+                    ("Gamma Robotics", "Technology"),
+                    ("Arts Club", "Technology"),
+                    ("Robotics Academy", "Academic"),
+                )
+            ]
+        )
+        session.commit()
+
+    first = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 1, "page_size": 1},
+    )
+    second = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 2, "page_size": 1},
+    )
+    empty = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "robotics", "category": "technology", "page": 4, "page_size": 1},
+    )
+    assert first.status_code == second.status_code == empty.status_code == 200
+    assert first.json()["total"] == second.json()["total"] == empty.json()["total"] == 3
+    assert [c["name"] for c in first.json()["clubs"]] == ["Alpha Robotics"]
+    assert [c["name"] for c in second.json()["clubs"]] == ["Beta Robotics"]
+    assert empty.json()["clubs"] == []
+
+
+def test_club_search_validates_bounds_and_enforces_authorization(auth_client, migrated_engine):
+    headers = _student_access_headers(auth_client)
+    invalid_search = auth_client.get(
+        "/api/v1/clubs", headers=headers,
+        params={"search": "x" * 121},
+    )
+    assert invalid_search.status_code == 422
+    invalid_category = auth_client.get(
+        "/api/v1/clubs",
+        headers=headers,
+        params={"category": "x" * 81},
+    )
+    assert invalid_category.status_code == 422
+    missing_auth = auth_client.get(
+        "/api/v1/clubs", params={"search": "Robotics", "category": "Technology"}
+    )
+    assert missing_auth.status_code == 401
+
+    with Session(migrated_engine) as session:
+        session.add(User(
+            full_name="Search Affairs Officer",
+            email="search-affairs@example.edu",
+            university_id="SEARCH-AFFAIRS-01",
+            password_hash=hash_password("SyntheticAffairsPassword123!"),
+            account_type=AccountType.STUDENT_AFFAIRS,
+        ))
+        session.commit()
+    login = auth_client.post(
+        "/api/v1/auth/login",
+        json={"email": "search-affairs@example.edu", "password": "SyntheticAffairsPassword123!"},
+    )
+    assert login.status_code == 200
+    affairs = auth_client.get(
+        "/api/v1/clubs",
+        headers=access_headers(login.json()["access_token"]),
+        params={"search": "Robotics", "category": "Technology"},
+    )
+    assert affairs.status_code == 403
 
 
 def test_club_timestamps_are_database_managed(migrated_engine, registration_client):

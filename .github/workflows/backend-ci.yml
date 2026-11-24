@@ -2,13 +2,15 @@ name: Backend checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/integration-rehearsal-camp-11-20261124]
     paths:
       - "backend/**"
+      - "features/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "features/**"
       - ".github/workflows/backend-ci.yml"
 
 jobs:
