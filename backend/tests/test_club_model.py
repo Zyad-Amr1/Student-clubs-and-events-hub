@@ -57,9 +57,11 @@ def test_club_browse_openapi_documents_authenticated_student_contract():
     assert operation["security"] == [{"HTTPBearer": []}]
     assert {"401", "403", "422"} <= set(operation["responses"])
     parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
-    assert set(parameters) == {"page", "page_size"}
+    assert set(parameters) == {"page", "page_size", "search", "category"}
     assert parameters["page"]["schema"]["maximum"] == 10_000
     assert parameters["page_size"]["schema"]["maximum"] == 100
+    assert parameters["search"]["required"] is False
+    assert parameters["category"]["required"] is False
     assert set(app.openapi()["components"]["schemas"]["ClubBrowseResponse"]["properties"]) == {
         "clubs",
         "page",
