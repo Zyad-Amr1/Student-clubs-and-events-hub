@@ -213,6 +213,38 @@ void main() {
     expect(find.byKey(const ValueKey('retry-clubs')), findsOneWidget);
   });
 
+  testWidgets(
+    'local search filters loaded clubs without claiming server-wide results',
+    (tester) async {
+      final backend = _MockTransport();
+      await tester.pumpWidget(_app(backend, _MemoryStore()));
+      await tester.pumpAndSettle();
+      await _login(tester);
+
+      expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
+      expect(find.byKey(const ValueKey('club-search')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('club-search')),
+        'unlisted music club',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('No matching clubs among the loaded results.'),
+        findsOneWidget,
+      );
+      expect(find.text('Mock Campus Engineering Club'), findsNothing);
+
+      await tester.tap(find.text('Clear filters'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
+      expect(
+        backend.paths.where((path) => path == '/api/v1/clubs').length,
+        1,
+      );
+    },
+  );
+
   testWidgets('client validation prevents blank registration', (tester) async {
     await tester.pumpWidget(_app(_MockTransport(), _MemoryStore()));
     await tester.pumpAndSettle();
