@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -308,11 +309,16 @@ class CampusApi {
     return ClubPage.fromJson(json);
   }
 
-  Future<ClubDetails> clubDetails(String token, String clubId) async {
+  Future<ClubDetails> clubDetails(
+    String token,
+    String clubId, {
+    int page = 1,
+  }) async {
     final json = await _request(
       'GET',
       '/api/v1/clubs/${Uri.encodeComponent(clubId)}',
       token: token,
+      query: {'page': '$page', 'page_size': '20'},
     );
     return ClubDetails.fromJson(json);
   }
