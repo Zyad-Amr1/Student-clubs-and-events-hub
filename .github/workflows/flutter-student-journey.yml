@@ -27,7 +27,17 @@ jobs:
         run: flutter pub get
       - name: Check Dart formatting
         working-directory: mobile
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: |
+          dart format lib test
+          echo __BEGIN_FMT_API__
+          base64 -w0 lib/core/api_client.dart
+          echo
+          echo __END_FMT_API__
+          echo __BEGIN_FMT_TEST__
+          base64 -w0 test/api_client_test.dart
+          echo
+          echo __END_FMT_TEST__
+          git diff --exit-code -- lib test
       - name: Flutter analyzer
         working-directory: mobile
         run: flutter analyze
