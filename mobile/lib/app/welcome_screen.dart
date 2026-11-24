@@ -2,7 +2,9 @@ import 'package:campusconnect/app/routes.dart';
 import 'package:material_ui/material_ui.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({super.key, this.restoreError});
+
+  final String? restoreError;
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +43,9 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 54),
+              const SizedBox(height: 48),
               Text(
-                'Your campus community starts here.',
+                'Find your people on campus.',
                 style: textTheme.headlineLarge?.copyWith(
                   color: colors.onSurface,
                   fontWeight: FontWeight.w700,
@@ -53,7 +55,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Meet people, explore interests, and find events happening across your university.',
+                'Discover student clubs, explore your interests, and find upcoming campus events.',
                 style: textTheme.bodyLarge?.copyWith(
                   color: colors.onSurfaceVariant,
                   height: 1.5,
@@ -61,7 +63,8 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               Card(
-                color: colors.surfaceContainerLow,
+                color: const Color(0xFFFFF4F4),
+                elevation: 0,
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Row(
@@ -74,14 +77,14 @@ class WelcomeScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'A place for every interest',
+                              'Explore what you love',
                               style: textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Live club data is not connected yet.',
+                              'Sign in with your student account to view approved clubs and events.',
                               style: textTheme.bodyMedium?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),
@@ -94,6 +97,14 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+              if (restoreError != null) ...[
+                Text(
+                  restoreError!,
+                  key: const ValueKey<String>('session-restore-error'),
+                  style: TextStyle(color: colors.error),
+                ),
+                const SizedBox(height: 16),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -101,7 +112,7 @@ class WelcomeScreen extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pushNamed(AppRoutes.authentication),
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text('Get started'),
+                  label: const Text('Sign in or create an account'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -112,7 +123,7 @@ class WelcomeScreen extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pushNamed(AppRoutes.clubs),
                   icon: const Icon(Icons.groups_outlined),
-                  label: const Text('Club discovery'),
+                  label: const Text('Explore clubs'),
                 ),
               ),
               const SizedBox(height: 22),
