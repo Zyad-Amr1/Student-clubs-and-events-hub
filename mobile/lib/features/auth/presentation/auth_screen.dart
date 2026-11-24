@@ -1,5 +1,4 @@
 import 'package:campusconnect/app/app.dart';
-import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -55,8 +54,7 @@ class _AuthScreenState extends State<AuthScreen> {
         await session.signIn(_email.text, _password.text);
       }
       if (!mounted) return;
-      Navigator.of(context)
-          .pushNamedAndRemoveUntil(AppRoutes.clubs, (route) => false);
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } on ApiFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
