@@ -1,7 +1,7 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -150,8 +150,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     validator: (value) {
                       final required = _required(value);
                       if (required != null) return required;
-                      if (_register && value!.length < 8)
+                      if (_register && value!.length < 8) {
                         return 'Use at least 8 characters';
+                      }
                       return null;
                     },
                   ),
@@ -166,8 +167,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value != _password.text)
+                        if (value != _password.text) {
                           return 'Passwords do not match';
+                        }
                         return _required(value);
                       },
                     ),

@@ -1,7 +1,7 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ClubDetailsScreen extends StatefulWidget {
   const ClubDetailsScreen({required this.club, super.key});

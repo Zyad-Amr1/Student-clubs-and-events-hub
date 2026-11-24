@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 abstract final class CampusConnectTheme {
   static final ThemeData light = ThemeData(
@@ -8,7 +8,7 @@ abstract final class CampusConnectTheme {
       surface: const Color(0xFFF6F8FB),
     ),
     scaffoldBackgroundColor: const Color(0xFFF6F8FB),
-    appBarTheme: const AppBarThemeData(
+    appBarTheme: const AppBarTheme(
       backgroundColor: Color(0xFFF6F8FB),
       foregroundColor: Color(0xFF18364D),
     ),

@@ -6,7 +6,7 @@ import 'package:campusconnect/core/session.dart';
 import 'package:campusconnect/features/auth/presentation/auth_screen.dart';
 import 'package:campusconnect/features/auth/presentation/profile_screen.dart';
 import 'package:campusconnect/features/clubs/presentation/clubs_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class StudentSessionScope extends InheritedNotifier<StudentSession> {
   const StudentSessionScope({

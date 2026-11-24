@@ -1,6 +1,6 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

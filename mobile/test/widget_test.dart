@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/session.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _MemoryStore implements TokenStore {
@@ -63,13 +63,15 @@ class _MockTransport implements ApiTransport {
     }
     if (uri.path.endsWith('/logout')) return const ApiReply(204, '');
     if (uri.path == '/api/v1/clubs') {
-      if (browseFails)
+      if (browseFails) {
         return const ApiReply(503, '{"detail":"Database unavailable"}');
-      if (empty)
+      }
+      if (empty) {
         return const ApiReply(
           200,
           '{"clubs":[],"page":1,"page_size":20,"total":0}',
         );
+      }
       return const ApiReply(
         200,
         '{"clubs":[{"id":"22222222-2222-4222-8222-222222222222","name":"Mock Campus Engineering Club","description":"Backend returned club","category":"Academic","logo_url":null}],"page":1,"page_size":20,"total":1}',

@@ -2,7 +2,7 @@ import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/club_details_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ClubsScreen extends StatefulWidget {
   const ClubsScreen({super.key});
@@ -62,8 +62,9 @@ class _ClubsScreenState extends State<ClubsScreen> {
       }
       setState(() => _error = error.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Could not load clubs. Please retry.');
+      }
     } finally {
       if (mounted) {
         setState(() {
