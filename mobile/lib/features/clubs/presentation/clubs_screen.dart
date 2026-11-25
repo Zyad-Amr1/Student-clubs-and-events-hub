@@ -2,6 +2,7 @@ import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/club_details_screen.dart';
+import 'package:campusconnect/features/events/presentation/my_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ClubsScreen extends StatefulWidget {
@@ -164,6 +165,13 @@ class _ClubsScreenState extends State<ClubsScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'My Events Calendar',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MyEventsScreen()),
+            ),
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
           IconButton(
             key: const ValueKey('open-profile'),
             tooltip: 'Student profile',

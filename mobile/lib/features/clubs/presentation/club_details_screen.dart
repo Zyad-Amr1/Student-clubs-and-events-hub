@@ -1,6 +1,7 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ClubDetailsScreen extends StatefulWidget {
@@ -129,6 +130,13 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                         key: ValueKey('event-${event.id}'),
                         child: ListTile(
                           title: Text(event.title),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  StudentEventDetailsScreen(event: event),
+                            ),
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

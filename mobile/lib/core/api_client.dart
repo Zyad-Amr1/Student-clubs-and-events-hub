@@ -159,6 +159,41 @@ class CampusEvent {
   );
 }
 
+enum ReservationStatus { confirmed, waitlisted }
+
+class EventReservation {
+  const EventReservation({
+    required this.event,
+    required this.status,
+    required this.waitlistPosition,
+  });
+
+  final CampusEvent event;
+  final ReservationStatus status;
+  final int? waitlistPosition;
+
+  factory EventReservation.fromJson(JsonObject json) {
+    try {
+      final event = CampusEvent.fromJson(json['event'] as JsonObject);
+      final status = ReservationStatus.values.byName(json['status'] as String);
+      final position = json['waitlist_position'] as int?;
+      if (json['event_id'] != event.id ||
+          (status == ReservationStatus.confirmed && position != null) ||
+          (status == ReservationStatus.waitlisted &&
+              (position == null || position < 1))) {
+        throw const FormatException();
+      }
+      return EventReservation(
+        event: event,
+        status: status,
+        waitlistPosition: position,
+      );
+    } on Object {
+      throw const ApiFailure('Unexpected reservation response. Please retry.');
+    }
+  }
+}
+
 class ClubPage {
   const ClubPage({
     required this.clubs,
@@ -470,6 +505,36 @@ class CampusApi {
       body: {'decision': decision},
     );
     return ManagedEvent.fromJson(json);
+  }
+
+  Future<List<EventReservation>> myReservations(String token) async {
+    final json = await _request('GET', '/api/v1/me/reservations', token: token);
+    final reservations = json['reservations'];
+    if (reservations is! List ||
+        reservations.any((item) => item is! JsonObject)) {
+      throw const ApiFailure('Unexpected reservation response. Please retry.');
+    }
+    return reservations
+        .cast<JsonObject>()
+        .map(EventReservation.fromJson)
+        .toList();
+  }
+
+  String _reservationPath(String eventId) =>
+      '/api/v1/events/${Uri.encodeComponent(eventId)}/reservations';
+
+  Future<EventReservation> reserveEvent(String token, String eventId) async {
+    final result = EventReservation.fromJson(
+      await _request('POST', _reservationPath(eventId), token: token),
+    );
+    if (result.event.id != eventId) {
+      throw const ApiFailure('Unexpected reservation response. Please retry.');
+    }
+    return result;
+  }
+
+  Future<void> cancelReservation(String token, String eventId) async {
+    await _request('DELETE', _reservationPath(eventId), token: token);
   }
 
   Future<ClubPage> clubs(String token, {int page = 1}) async {
