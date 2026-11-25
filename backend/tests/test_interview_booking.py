@@ -75,7 +75,7 @@ def test_interview_booking_capacity_fcfs_and_partial_publication(
     for index, credentials in ((2, third), (1, second), (0, first)):
         response = draft_client.put(paths[index], headers=credentials, json={"day_id": day_id})
         assert response.status_code == 200, response.text
-        assert response.json()["status"] == "day_selected"
+        assert response.json()["status"] == "unscheduled"
     assert draft_client.get(paths[0], headers=second).status_code == 404
     assert draft_client.put(day_url, headers=owner, json=setup).status_code == 409
     preview = draft_client.get(schedule_path, headers=owner).json()["slots"]

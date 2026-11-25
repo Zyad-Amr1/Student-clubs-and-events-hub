@@ -5,6 +5,15 @@ import 'package:material_ui/material_ui.dart';
 List<JsonObject> _items(JsonObject data, String key) =>
     (data[key] as List).cast<JsonObject>();
 
+String _statusLabel(Object? status) => switch (status) {
+  'confirmed' => 'Confirmed',
+  'attended' => 'Attended',
+  'no_show' => 'No-show',
+  'cancelled' => 'Cancelled',
+  'expired' => 'Expired',
+  _ => 'Unscheduled',
+};
+
 String _utcTime(String raw) {
   final utc = DateTime.parse(raw).toUtc();
   return '${_dateKey(utc)} ${_clock(utc.hour * 60 + utc.minute)} UTC';
@@ -118,24 +127,47 @@ class _InterviewPageState extends State<_InterviewPage> {
 }
 
 class StudentInterviewScreen extends StatelessWidget {
-  const StudentInterviewScreen(this.application, {super.key});
-  final MembershipApplication application;
+  StudentInterviewScreen(MembershipApplication application, {super.key})
+    : applicationId = application.id,
+      clubName = application.clubName;
+  const StudentInterviewScreen.forApplication(
+    this.applicationId,
+    this.clubName, {
+    super.key,
+  });
+  final String applicationId;
+  final String clubName;
 
   @override
   Widget build(BuildContext context) => _InterviewPage(
-    title: 'Interview · ${application.clubName}',
-    load: (api, token) => api.studentInterview(token, application.id),
+    title: 'Interview · $clubName',
+    load: (api, token) => api.studentInterview(token, applicationId),
     children: (context, data, busy, change) {
       final booking = data['booking'] as JsonObject?;
-      final confirmed = booking?['status'] == 'confirmed';
+      final status = booking?['status'];
+      final hasAppointment = {
+        'confirmed',
+        'attended',
+        'no_show',
+      }.contains(status);
+      final waiting = status == 'unscheduled';
       final days = _items(data, 'days');
       return [
-        if (confirmed) ...[
-          const Text('Confirmed interview'),
+        if (hasAppointment) ...[
+          Text('${_statusLabel(status)} interview'),
           Text(_utcTime(booking!['starts_at'] as String)),
           Text('Ends ${_utcTime(booking['ends_at'] as String)}'),
         ] else ...[
-          if (booking != null) ...[
+          if (status == 'cancelled') ...[
+            const Text('Interview cancelled. Choose another day to continue.'),
+            if (booking?['cancellation_reason'] case final String reason)
+              Text(reason),
+          ],
+          if (status == 'expired')
+            const Text(
+              'Your interview day expired without an appointment. Choose another day.',
+            ),
+          if (waiting && booking != null) ...[
             Text('Day selected · ${booking['day']} UTC'),
             const Text('Appointment status · Unscheduled'),
             const Text(
@@ -146,14 +178,16 @@ class StudentInterviewScreen extends StatelessWidget {
                   ? null
                   : () => change(
                       (api, token) =>
-                          api.withdrawInterviewDay(token, application.id),
+                          api.withdrawInterviewDay(token, applicationId),
                     ),
               child: const Text('Withdraw day selection'),
             ),
           ],
           const SizedBox(height: 12),
           const Text('Choose an interview day (UTC)'),
-          if (days.isEmpty) const Text('No available interview days.'),
+          if (days.isEmpty ||
+              (!waiting && days.every((day) => day['seats_available'] == 0)))
+            const Text('No Available Days'),
           for (final day in days)
             ListTile(
               title: Text(day['day'] as String),
@@ -162,17 +196,17 @@ class StudentInterviewScreen extends StatelessWidget {
                     ? 'Full'
                     : '${day['seats_available']} places available',
               ),
-              trailing: booking?['day_id'] == day['id']
+              trailing: waiting && booking?['day_id'] == day['id']
                   ? const Icon(Icons.check)
                   : null,
               enabled:
                   !busy &&
                   day['seats_available'] != 0 &&
-                  booking?['day_id'] != day['id'],
+                  (!waiting || booking?['day_id'] != day['id']),
               onTap: () => change(
                 (api, token) => api.selectInterviewDay(
                   token,
-                  application.id,
+                  applicationId,
                   day['id'] as String,
                 ),
               ),
@@ -219,6 +253,7 @@ class AdminInterviewDaysScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('${day['day']} UTC'),
+                  if (day['cancelled'] == true) const Text('Cancelled'),
                   Text(
                     '${day['selected']} of ${day['capacity']} places selected',
                   ),
@@ -226,18 +261,29 @@ class AdminInterviewDaysScreen extends StatelessWidget {
                   Wrap(
                     children: [
                       TextButton(
-                        onPressed: busy ? null : () => edit(day),
+                        onPressed: busy || day['cancelled'] == true
+                            ? null
+                            : () => edit(day),
                         child: const Text('Edit day and availability'),
                       ),
                       TextButton(
                         onPressed: busy
                             ? null
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => _ScheduleScreen(club, day),
-                                ),
-                              ),
-                        child: const Text('Generate schedule'),
+                            : () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => _ScheduleScreen(club, day),
+                                  ),
+                                );
+                                if (context.mounted) {
+                                  await change((_, _) async {});
+                                }
+                              },
+                        child: Text(
+                          day['cancelled'] == true
+                              ? 'View history'
+                              : 'Generate schedule',
+                        ),
                       ),
                     ],
                   ),
@@ -428,6 +474,18 @@ class _ScheduleScreenState extends State<_ScheduleScreen> {
     ),
     children: (context, data, busy, change) {
       final slots = _items(data, 'slots');
+      final cancelled = data['cancelled'] == true;
+      final club = widget.club.id;
+      final day = widget.day['id'] as String;
+      Future<void> cancel(JsonObject target) async {
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => _CancelInterviewScreen(club, day, target),
+          ),
+        );
+        if (changed == true && context.mounted) await change((_, _) async {});
+      }
+
       final publishable = slots
           .where(
             (slot) =>
@@ -436,6 +494,24 @@ class _ScheduleScreenState extends State<_ScheduleScreen> {
           )
           .toList();
       return [
+        if (cancelled)
+          const Text('Interview day cancelled')
+        else ...[
+          OutlinedButton(
+            onPressed: busy ? null : () => cancel({'scope': 'day'}),
+            child: const Text('Cancel entire day'),
+          ),
+          for (final period in _items(data, 'periods'))
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () => cancel({'scope': 'period', 'period': period}),
+              child: Text(
+                'Cancel period ${_clock(period['start_minute'] as int)}–'
+                '${_clock(period['end_minute'] as int)} UTC',
+              ),
+            ),
+        ],
         if (slots.isEmpty)
           const Text('No eligible students have selected this day.'),
         for (final slot in slots)
@@ -458,13 +534,84 @@ class _ScheduleScreenState extends State<_ScheduleScreen> {
                     }),
             )
           else
-            ListTile(
-              title: Text(slot['applicant_name'] as String),
-              subtitle: Text(
-                slot['status'] == 'confirmed'
-                    ? 'Confirmed · ${_utcTime(slot['starts_at'] as String)}'
-                    : 'Unscheduled',
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text(slot['applicant_name'] as String),
+                  subtitle: Text(
+                    [
+                      _statusLabel(slot['status']),
+                      if (slot['starts_at'] case final String start)
+                        _utcTime(start),
+                      if (slot['cancellation_reason'] case final String reason)
+                        reason,
+                    ].join('\n'),
+                  ),
+                ),
+                if (slot['status'] == 'confirmed')
+                  Wrap(
+                    children: [
+                      if (!cancelled)
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => cancel({
+                                  'scope': 'appointment',
+                                  'selection_id': slot['selection_id'],
+                                }),
+                          child: const Text('Cancel appointment'),
+                        ),
+                      if (slot['ends_at'] case final String end)
+                        if (!DateTime.parse(end).isAfter(DateTime.now()))
+                          for (final status in ['attended', 'no_show'])
+                            TextButton(
+                              onPressed: busy
+                                  ? null
+                                  : () async {
+                                      final yes = await showDialog<bool>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: Text(
+                                            'Record ${_statusLabel(status)}?',
+                                          ),
+                                          content: Text(
+                                            slot['applicant_name'] as String,
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, false),
+                                              child: const Text('Back'),
+                                            ),
+                                            FilledButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, true),
+                                              child: const Text(
+                                                'Record attendance',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (yes == true && context.mounted) {
+                                        await change(
+                                          (api, token) =>
+                                              api.recordInterviewAttendance(
+                                                token,
+                                                club,
+                                                day,
+                                                slot['selection_id'] as String,
+                                                status,
+                                              ),
+                                        );
+                                      }
+                                    },
+                              child: Text('Record ${_statusLabel(status)}'),
+                            ),
+                    ],
+                  ),
+              ],
             ),
         if (publishable.isNotEmpty)
           FilledButton(
@@ -487,6 +634,15 @@ class _ScheduleScreenState extends State<_ScheduleScreen> {
                   ),
             child: Text('Publish ${publishable.length} selected appointments'),
           ),
+        if (_items(data, 'cancellations').isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text('Cancellation history'),
+          for (final audit in _items(data, 'cancellations'))
+            ListTile(
+              title: Text(audit['reason'] as String),
+              subtitle: Text(_utcTime(audit['created_at'] as String)),
+            ),
+        ],
       ];
     },
   );
@@ -502,19 +658,215 @@ class InterviewAppointmentsScreen extends StatelessWidget {
     children: (context, data, busy, change) {
       final items = _items(data, 'appointments');
       return [
-        if (items.isEmpty) const Text('No confirmed interviews yet.'),
+        TextButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const InterviewNoticesScreen(),
+            ),
+          ),
+          child: const Text('Interview notifications'),
+        ),
+        if (items.isEmpty) const Text('No interview appointments yet.'),
         for (final item in items)
           Card(
             child: ListTile(
               leading: const Icon(Icons.event_available_outlined),
               title: Text(item['club_name'] as String),
               subtitle: Text(
-                '${item['notice']}\n${_utcTime(item['starts_at'] as String)}'
-                '\nEnds ${_utcTime(item['ends_at'] as String)}',
+                [
+                  _statusLabel(item['status']),
+                  if (item['starts_at'] case final String start)
+                    _utcTime(start)
+                  else
+                    '${item['day']} UTC',
+                  if (item['ends_at'] case final String end)
+                    'Ends ${_utcTime(end)}',
+                  if (item['cancellation_reason'] case final String reason)
+                    reason,
+                ].join('\n'),
               ),
+              onTap: () => _openBooking(context, item),
             ),
           ),
       ];
     },
+  );
+}
+
+void _openBooking(BuildContext context, JsonObject item) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => StudentInterviewScreen.forApplication(
+        item['application_id'] as String,
+        item['club_name'] as String,
+      ),
+    ),
+  );
+}
+
+class InterviewNoticesScreen extends StatelessWidget {
+  const InterviewNoticesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => _InterviewPage(
+    title: 'Interview Notifications',
+    load: (api, token) => api.interviewNotices(token),
+    children: (context, data, busy, change) {
+      final notices = _items(data, 'notices');
+      return [
+        if (notices.isEmpty) const Text('No interview notifications yet.'),
+        for (final notice in notices)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.notifications_outlined),
+              title: Text(notice['message'] as String),
+              subtitle: Text(_utcTime(notice['created_at'] as String)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openBooking(context, notice),
+            ),
+          ),
+      ];
+    },
+  );
+}
+
+class _CancelInterviewScreen extends StatefulWidget {
+  const _CancelInterviewScreen(this.club, this.day, this.target);
+  final String club, day;
+  final JsonObject target;
+
+  @override
+  State<_CancelInterviewScreen> createState() => _CancelInterviewScreenState();
+}
+
+class _CancelInterviewScreenState extends State<_CancelInterviewScreen> {
+  final _reason = TextEditingController();
+  Future<JsonObject>? _preview;
+  bool _submitting = false;
+  bool _stale = false;
+  String? _error;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _preview ??= _fetch();
+  }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<JsonObject> _fetch() {
+    final session = StudentSessionScope.of(context);
+    return session.authenticated(
+      (token) => session.api.previewInterviewCancellation(
+        token,
+        widget.club,
+        widget.day,
+        widget.target,
+      ),
+    );
+  }
+
+  void _refresh() => setState(() {
+    _preview = _fetch();
+    _error = null;
+    _stale = false;
+  });
+
+  Future<void> _cancel(String previewToken) async {
+    final reason = _reason.text.trim();
+    if (reason.isEmpty) {
+      setState(() => _error = 'Enter a reason the affected students can see.');
+      return;
+    }
+    final session = StudentSessionScope.of(context);
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await session.authenticated(
+        (token) => session.api.cancelInterview(
+          token,
+          widget.club,
+          widget.day,
+          widget.target,
+          previewToken,
+          reason,
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Cancellation saved.')));
+      Navigator.pop(context, true);
+    } on ApiFailure catch (error) {
+      _error = error.message;
+      _stale = error.statusCode == 409;
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Confirm Interview Cancellation')),
+    body: FutureBuilder<JsonObject>(
+      future: _preview,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(snapshot.error.toString()),
+                TextButton(onPressed: _refresh, child: const Text('Try again')),
+              ],
+            ),
+          );
+        }
+        final data = snapshot.data!;
+        final affected = _items(data, 'affected');
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text('${affected.length} affected students'),
+            if (affected.isEmpty) const Text('No students will be notified.'),
+            for (final item in affected)
+              ListTile(
+                title: Text(item['applicant_name'] as String),
+                subtitle: Text(_statusLabel(item['status'])),
+              ),
+            TextField(
+              controller: _reason,
+              enabled: !_submitting,
+              maxLength: 1000,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Cancellation reason shown to students',
+              ),
+            ),
+            if (_error case final error?) Text(error),
+            if (_stale)
+              TextButton(
+                onPressed: _refresh,
+                child: const Text('Refresh affected students'),
+              ),
+            if (_submitting) const LinearProgressIndicator(),
+            FilledButton(
+              onPressed: _submitting || _stale
+                  ? null
+                  : () => _cancel(data['preview_token'] as String),
+              child: const Text('Confirm cancellation'),
+            ),
+          ],
+        );
+      },
+    ),
   );
 }
