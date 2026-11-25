@@ -154,7 +154,9 @@ class _ReviewEventsScreenState extends State<ReviewEventsScreen> {
                           Text('Capacity: ${event.seatCapacity}'),
                           const Text('Status: pending · Not published'),
                           const SizedBox(height: 8),
-                          Row(
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
                             children: [
                               FilledButton(
                                 key: ValueKey('approve-${event.id}'),
@@ -163,7 +165,6 @@ class _ReviewEventsScreenState extends State<ReviewEventsScreen> {
                                     : null,
                                 child: const Text('Approve'),
                               ),
-                              const SizedBox(width: 12),
                               OutlinedButton(
                                 key: ValueKey('reject-${event.id}'),
                                 onPressed: _actingId == null
