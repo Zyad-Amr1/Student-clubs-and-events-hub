@@ -69,8 +69,10 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
     routes: {
       AppRoutes.home: (context) => const _HomeGate(),
       AppRoutes.authentication: (context) => const AuthScreen(),
-      AppRoutes.clubAdminLogin: (context) => const AuthScreen(portal: PortalRole.clubAdmin),
-      AppRoutes.studentAffairsLogin: (context) => const AuthScreen(portal: PortalRole.studentAffairs),
+      AppRoutes.clubAdminLogin: (context) =>
+          const AuthScreen(portal: PortalRole.clubAdmin),
+      AppRoutes.studentAffairsLogin: (context) =>
+          const AuthScreen(portal: PortalRole.studentAffairs),
       AppRoutes.clubs: (context) => const ClubsScreen(),
       AppRoutes.profile: (context) => const ProfileScreen(),
     },
@@ -110,8 +112,12 @@ class _HomeGate extends StatelessWidget {
     if (!session.signedIn) return const WelcomeScreen();
     return switch (session.portal) {
       PortalRole.student => const ClubsScreen(),
-      PortalRole.clubAdmin => const RoleHomeScreen(portal: PortalRole.clubAdmin),
-      PortalRole.studentAffairs => const RoleHomeScreen(portal: PortalRole.studentAffairs),
+      PortalRole.clubAdmin => const RoleHomeScreen(
+        portal: PortalRole.clubAdmin,
+      ),
+      PortalRole.studentAffairs => const RoleHomeScreen(
+        portal: PortalRole.studentAffairs,
+      ),
     };
   }
 }

@@ -25,13 +25,9 @@ jobs:
       - name: Resolve Flutter dependencies
         working-directory: mobile
         run: flutter pub get
-      - name: Format Dart sources and print patch
+      - name: Check Dart formatting
         working-directory: mobile
-        run: |
-          dart format lib test
-          echo '==ROLE_FORMAT_DIFF_BEGIN=='
-          git -c color.ui=false diff -- lib test
-          echo '==ROLE_FORMAT_DIFF_END=='
+        run: dart format --output=none --set-exit-if-changed lib test
       - name: Flutter analyzer
         working-directory: mobile
         run: flutter analyze

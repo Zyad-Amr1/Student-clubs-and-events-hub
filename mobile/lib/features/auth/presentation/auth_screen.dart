@@ -54,7 +54,11 @@ class _AuthScreenState extends State<AuthScreen> {
           confirmPassword: _confirmation.text,
         );
       } else {
-        await session.signIn(_email.text, _password.text, portal: widget.portal);
+        await session.signIn(
+          _email.text,
+          _password.text,
+          portal: widget.portal,
+        );
       }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -72,7 +76,9 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_register ? 'Create student account' : widget.portal.loginTitle),
+      title: Text(
+        _register ? 'Create student account' : widget.portal.loginTitle,
+      ),
     ),
     body: SafeArea(
       child: Center(
@@ -198,21 +204,22 @@ class _AuthScreenState extends State<AuthScreen> {
                         : Text(_register ? 'Register and sign in' : 'Sign in'),
                   ),
                   const SizedBox(height: 10),
-                  if (widget.portal == PortalRole.student) TextButton(
-                    key: const ValueKey('auth-toggle'),
-                    onPressed: _submitting
-                        ? null
-                        : () => setState(() {
-                            _register = !_register;
-                            _error = null;
-                            _formKey.currentState?.reset();
-                          }),
-                    child: Text(
-                      _register
-                          ? 'Already have an account? Sign in'
-                          : 'New student? Create an account',
+                  if (widget.portal == PortalRole.student)
+                    TextButton(
+                      key: const ValueKey('auth-toggle'),
+                      onPressed: _submitting
+                          ? null
+                          : () => setState(() {
+                              _register = !_register;
+                              _error = null;
+                              _formKey.currentState?.reset();
+                            }),
+                      child: Text(
+                        _register
+                            ? 'Already have an account? Sign in'
+                            : 'New student? Create an account',
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

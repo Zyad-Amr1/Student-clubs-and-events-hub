@@ -10,12 +10,16 @@ abstract class TokenStore {
   Future<void> write(String token);
   Future<void> clear();
 
-  // A stored portal is an untrusted UI preference, rechecked against FastAPI.
-  Future<String?> readPortal() async => null;
-  Future<void> writePortal(String portal) async {}
+
 }
 
-class AndroidKeystoreTokenStore implements TokenStore {
+/// Optional preference interface: old Student token stores remain compatible.
+abstract class PortalPreferenceStore {
+  Future<String?> readPortal();
+  Future<void> writePortal(String portal);
+}
+
+class AndroidKeystoreTokenStore implements TokenStore, PortalPreferenceStore {
   const AndroidKeystoreTokenStore();
 
   static const MethodChannel _channel = MethodChannel(
@@ -74,21 +78,33 @@ class StudentSession extends ChangeNotifier {
     switch (portal) {
       case PortalRole.student:
         if (user.accountType != 'student') {
-          throw const ApiFailure('This portal requires a Student account.', statusCode: 403);
+          throw const ApiFailure(
+            'This portal requires a Student account.',
+            statusCode: 403,
+          );
         }
         return const [];
       case PortalRole.clubAdmin:
         if (user.accountType != 'student') {
-          throw const ApiFailure('Club administration requires a Student account.', statusCode: 403);
+          throw const ApiFailure(
+            'Club administration requires a Student account.',
+            statusCode: 403,
+          );
         }
         final assigned = await api.managedClubs(token);
         if (assigned.isEmpty) {
-          throw const ApiFailure('No club administrator assignment found.', statusCode: 403);
+          throw const ApiFailure(
+            'No club administrator assignment found.',
+            statusCode: 403,
+          );
         }
         return assigned;
       case PortalRole.studentAffairs:
         if (user.accountType != 'student_affairs') {
-          throw const ApiFailure('This portal requires a Student Affairs account.', statusCode: 403);
+          throw const ApiFailure(
+            'This portal requires a Student Affairs account.',
+            statusCode: 403,
+          );
         }
         await api.verifyStudentAffairs(token);
         return const [];
@@ -104,8 +120,13 @@ class StudentSession extends ChangeNotifier {
       if (saved != null && saved.isNotEmpty) {
         try {
           final user = await api.profile(saved);
-          final savedChoice = portalFromStorage(await store.readPortal());
-          final choice = savedChoice ??
+          final savedChoice = portalFromStorage(
+            store is PortalPreferenceStore
+                ? await (store as PortalPreferenceStore).readPortal()
+                : null,
+          );
+          final choice =
+              savedChoice ??
               (user.accountType == 'student_affairs'
                   ? PortalRole.studentAffairs
                   : PortalRole.student);
@@ -143,7 +164,9 @@ class StudentSession extends ChangeNotifier {
       final user = await api.profile(token);
       final clubs = await _verifyPortal(token, user, portal);
       await store.write(token);
-      await store.writePortal(portal.name);
+      if (store is PortalPreferenceStore) {
+        await (store as PortalPreferenceStore).writePortal(portal.name);
+      }
       _token = token;
       _profile = user;
       _portal = portal;

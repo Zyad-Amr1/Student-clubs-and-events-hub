@@ -93,7 +93,8 @@ class WelcomeScreen extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   key: const ValueKey<String>('open-club-admin-auth'),
-                  onPressed: () => Navigator.of(context).pushNamed(AppRoutes.clubAdminLogin),
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(AppRoutes.clubAdminLogin),
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   label: const Text('Club Admin portal'),
                 ),
@@ -103,7 +104,9 @@ class WelcomeScreen extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   key: const ValueKey<String>('open-student-affairs-auth'),
-                  onPressed: () => Navigator.of(context).pushNamed(AppRoutes.studentAffairsLogin),
+                  onPressed: () =>
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.studentAffairsLogin),
                   icon: const Icon(Icons.school_outlined),
                   label: const Text('Student Affairs portal'),
                 ),

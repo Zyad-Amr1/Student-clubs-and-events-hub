@@ -208,10 +208,8 @@ class ManagedClub {
   final String id;
   final String name;
 
-  factory ManagedClub.fromJson(JsonObject json) => ManagedClub(
-        id: json['id'] as String,
-        name: json['name'] as String,
-      );
+  factory ManagedClub.fromJson(JsonObject json) =>
+      ManagedClub(id: json['id'] as String, name: json['name'] as String);
 }
 
 class CampusApi {

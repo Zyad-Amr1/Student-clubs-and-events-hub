@@ -28,10 +28,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
     } on ApiFailure catch (error) {
       if (!mounted) return;
       if (!session.signedIn) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.home,
-          (route) => false,
-        );
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
         return;
       }
       setState(() => _error = error.message);
@@ -43,10 +41,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   Future<void> _logout() async {
     await StudentSessionScope.of(context).logout();
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.home,
-      (route) => false,
-    );
+    Navigator.of(context)
+        .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
   }
 
   @override
@@ -59,10 +55,9 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         appBar: AppBar(title: const Text('Access denied')),
         body: Center(
           child: FilledButton(
-            onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
-              AppRoutes.home,
-              (route) => false,
-            ),
+            onPressed: () =>
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false),
             child: const Text('Return to portal selection'),
           ),
         ),
@@ -71,7 +66,7 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
     final admin = widget.portal == PortalRole.clubAdmin;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.portal.label + ' portal')),
+      appBar: AppBar(title: Text('${widget.portal.label} portal')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
@@ -81,20 +76,25 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            Text(admin
-                ? 'Your assigned clubs are verified by CampusConnect.'
-                : 'Your Student Affairs account has been verified by CampusConnect.'),
+            Text(
+              admin ? 'Your assigned clubs are verified by CampusConnect.' : 'Your Student Affairs account has been verified by CampusConnect.',
+            ),
             const SizedBox(height: 20),
             if (admin) ...[
-              Text('Clubs you administer', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Clubs you administer',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
               for (final club in session.managedClubs)
                 Card(
                   child: ListTile(
-                    key: ValueKey('managed-club-' + club.id),
+                    key: ValueKey('managed-club-${club.id}'),
                     leading: const Icon(Icons.groups_outlined),
                     title: Text(club.name),
-                    subtitle: const Text('Club-scoped administrator access verified'),
+                    subtitle: const Text(
+                      'Club-scoped administrator access verified',
+                    ),
                   ),
                 ),
             ] else
@@ -102,12 +102,17 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 child: ListTile(
                   leading: Icon(Icons.verified_user_outlined),
                   title: Text('Student Affairs access verified'),
-                  subtitle: Text('Approval and oversight tools are not available in this foundation.'),
+                  subtitle: Text(
+                    'Approval and oversight tools are not available in this foundation.',
+                  ),
                 ),
               ),
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: 18),
             OutlinedButton.icon(
