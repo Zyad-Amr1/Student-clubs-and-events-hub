@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/club_details_screen.dart';
+import 'package:campusconnect/features/events/presentation/my_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ClubsScreen extends StatefulWidget {
@@ -14,8 +17,9 @@ class ClubsScreen extends StatefulWidget {
 class _ClubsScreenState extends State<ClubsScreen> {
   final List<CampusClub> _clubs = [];
   final TextEditingController _searchController = TextEditingController();
-  final Set<String> _categories = {};
-  String _category = '';
+  final _categoryController = TextEditingController();
+  Timer? _debounce;
+  int _generation = 0;
   int _page = 1;
   int _total = 0;
   bool _loading = true;
@@ -30,30 +34,43 @@ class _ClubsScreenState extends State<ClubsScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
-  List<CampusClub> get _visibleClubs {
-    final term = _searchController.text.trim().toLowerCase();
-    return _clubs
-        .where((club) {
-          final nameMatches =
-              term.isEmpty || club.name.toLowerCase().contains(term);
-          final categoryMatches =
-              _category.isEmpty || club.category == _category;
-          return nameMatches && categoryMatches;
-        })
-        .toList(growable: false);
+  bool get _filtered =>
+      _searchController.text.trim().isNotEmpty ||
+      _categoryController.text.trim().isNotEmpty;
+
+  void _criteriaChanged() {
+    _debounce?.cancel();
+    _generation++;
+    setState(() => _loading = true);
+    _debounce = Timer(
+      const Duration(milliseconds: 250),
+      () => _load(reset: true),
+    );
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    _categoryController.clear();
+    _load(reset: true);
   }
 
   Future<void> _load({bool reset = false}) async {
+    if (!mounted) return;
     if (reset) {
+      _debounce?.cancel();
+      _generation++;
       setState(() {
         _clubs.clear();
         _total = 0;
         _page = 1;
         _loading = true;
+        _loadingMore = false;
         _error = null;
       });
     } else {
@@ -63,20 +80,28 @@ class _ClubsScreenState extends State<ClubsScreen> {
         _error = null;
       });
     }
+    final generation = _generation;
+    final page = _page;
+    final search = _searchController.text;
+    final category = _categoryController.text;
     try {
       final session = StudentSessionScope.of(context);
       final result = await session.authenticated(
-        (token) => session.api.clubs(token, page: _page),
+        (token) => session.api.clubs(
+          token,
+          page: page,
+          search: search,
+          category: category,
+        ),
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _clubs.addAll(result.clubs);
-        _categories.addAll(result.clubs.map((club) => club.category));
         _total = result.total;
         _page++;
       });
     } on ApiFailure catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       if (error.statusCode == 401) {
         Navigator.of(
           context,
@@ -85,11 +110,11 @@ class _ClubsScreenState extends State<ClubsScreen> {
       }
       setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() => _error = 'Could not load clubs. Please retry.');
       }
     } finally {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _loading = false;
           _loadingMore = false;
@@ -119,7 +144,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
       appBar: AppBar(
         title: const Text('Discover clubs'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(168),
+          preferredSize: const Size.fromHeight(140),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: Column(
@@ -127,43 +152,37 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 TextField(
                   key: const ValueKey('club-search'),
                   controller: _searchController,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => _criteriaChanged(),
                   maxLength: 120,
                   decoration: const InputDecoration(
-                    labelText: 'Search loaded clubs',
+                    labelText: 'Search clubs by name',
                     prefixIcon: Icon(Icons.search),
                     counterText: '',
                   ),
                 ),
-                DropdownButtonFormField<String>(
+                TextField(
                   key: const ValueKey('club-category-filter'),
-                  initialValue: _category,
+                  controller: _categoryController,
+                  maxLength: 80,
+                  onChanged: (_) => _criteriaChanged(),
                   decoration: const InputDecoration(
-                    labelText: 'Category in loaded clubs',
+                    labelText: 'Filter by category (exact name)',
                     prefixIcon: Icon(Icons.filter_list),
+                    counterText: '',
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('All categories'),
-                    ),
-                    for (final category in (_categories.toList()..sort()))
-                      DropdownMenuItem(value: category, child: Text(category)),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _category = value ?? '');
-                  },
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Filters cover loaded results; load more for other clubs.',
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'My Events Calendar',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MyEventsScreen()),
+            ),
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
           IconButton(
             key: const ValueKey('open-profile'),
             tooltip: 'Student profile',
@@ -179,23 +198,11 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ? _MessageState(message: _error!, onRetry: () => _load(reset: true))
             : _clubs.isEmpty
             ? _MessageState(
-                message: 'No approved active clubs are available yet.',
-                onRetry: () => _load(reset: true),
-              )
-            : _visibleClubs.isEmpty
-            ? _MessageState(
-                message: 'No matching clubs among the loaded results.',
-                onRetry: _clubs.length < _total
-                    ? () => _load()
-                    : () {
-                        setState(() {
-                          _searchController.clear();
-                          _category = '';
-                        });
-                      },
-                actionLabel: _clubs.length < _total
-                    ? 'Load more clubs'
-                    : 'Clear filters',
+                message: _filtered
+                    ? 'No clubs match your search and category.'
+                    : 'No approved active clubs are available yet.',
+                onRetry: _filtered ? _clearFilters : () => _load(reset: true),
+                actionLabel: _filtered ? 'Clear filters' : 'Refresh',
               )
             : RefreshIndicator(
                 onRefresh: () => _load(reset: true),
@@ -204,10 +211,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount:
-                      _visibleClubs.length +
+                      _clubs.length +
                       (_clubs.length < _total || _error != null ? 1 : 0),
                   itemBuilder: (context, index) {
-                    if (index == _visibleClubs.length) {
+                    if (index == _clubs.length) {
                       return Padding(
                         padding: const EdgeInsets.all(12),
                         child: _error != null
@@ -237,7 +244,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                               ),
                       );
                     }
-                    final club = _visibleClubs[index];
+                    final club = _clubs[index];
                     return Card(
                       child: ListTile(
                         key: ValueKey('club-${club.id}'),
