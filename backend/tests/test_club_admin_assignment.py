@@ -14,6 +14,7 @@ from test_event_creation import (
     payload,
     post_event,
     scenario,
+    synthetic_test_password_hash,
 )
 
 
