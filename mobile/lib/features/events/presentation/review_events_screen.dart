@@ -89,6 +89,7 @@ class _ReviewEventsScreenState extends State<ReviewEventsScreen> {
       await _load(reset: true);
     } on ApiFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
+      if (error.statusCode == 409 && mounted) await _load(reset: true);
     } catch (_) {
       if (mounted) setState(() => _error = 'Could not review event.');
     } finally {

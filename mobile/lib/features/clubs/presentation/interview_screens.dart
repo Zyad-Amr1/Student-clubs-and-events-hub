@@ -159,7 +159,10 @@ class StudentInterviewScreen extends StatelessWidget {
           Text('Ends ${_utcTime(booking['ends_at'] as String)}'),
         ] else ...[
           if (status == 'cancelled') ...[
-            const Text('Interview cancelled. Choose another day to continue.'),
+            const Text('Interview cancelled.'),
+            if (booking?['day'] case final String day) Text('Day: $day UTC'),
+            if (booking?['starts_at'] case final String startsAt)
+              Text('Scheduled: ${_utcTime(startsAt)}'),
             if (booking?['cancellation_reason'] case final String reason)
               Text(reason),
           ],
@@ -183,8 +186,10 @@ class StudentInterviewScreen extends StatelessWidget {
               child: const Text('Withdraw day selection'),
             ),
           ],
-          const SizedBox(height: 12),
-          const Text('Choose an interview day (UTC)'),
+          if (days.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Choose an interview day (UTC)'),
+          ],
           if (days.isEmpty ||
               (!waiting && days.every((day) => day['seats_available'] == 0)))
             const Text('No Available Days'),

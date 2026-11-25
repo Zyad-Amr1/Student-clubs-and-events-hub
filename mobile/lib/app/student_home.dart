@@ -68,6 +68,14 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
   CampusEvent? _featuredEvent;
   int _upcomingEventsCount = 0;
 
+  List<EventReservation> get _upcomingReservations => _reservations
+      .where(
+        (reservation) =>
+            reservation.status != ReservationStatus.cancelled &&
+            reservation.event.startsAt.isAfter(DateTime.now()),
+      )
+      .toList();
+
   @override
   void initState() {
     super.initState();
@@ -101,7 +109,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
         _reservations = [];
       }
 
-      // Discover upcoming event for the featured card
+      // Count only the student's upcoming reservations.
       CampusEvent? featured;
       var upcomingCount = 0;
 
@@ -118,9 +126,11 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
       if (featured == null && _clubs.isNotEmpty) {
         try {
           final details = await session.api.clubDetails(token, _clubs.first.id);
-          if (details.events.isNotEmpty) {
-            featured = details.events.first;
-            upcomingCount += details.events.length;
+          for (final event in details.events) {
+            if (event.startsAt.isAfter(now)) {
+              featured = event;
+              break;
+            }
           }
         } catch (_) {
           // Gracefully continue without featured event
@@ -130,9 +140,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
       if (!mounted) return;
       setState(() {
         _featuredEvent = featured;
-        _upcomingEventsCount = upcomingCount > 0
-            ? upcomingCount
-            : _reservations.length;
+        _upcomingEventsCount = upcomingCount;
         _loading = false;
       });
     } on ApiFailure catch (err) {
@@ -228,7 +236,8 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                       const SizedBox(width: 10),
                       CampusStatCard(
                         icon: Icons.confirmation_num_outlined,
-                        value: '${_reservations.length}',
+                        value:
+                            '${_reservations.where((r) => r.status != ReservationStatus.cancelled).length}',
                         label: 'My Bookings',
                         onTap: widget.onOpenCalendar,
                       ),
@@ -331,7 +340,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                 ),
               ),
               IconButton(
-                key: const ValueKey('open-profile'),
+                key: const ValueKey('header-open-profile'),
                 tooltip: 'Student profile',
                 onPressed: () =>
                     Navigator.of(context).pushNamed(AppRoutes.profile),
@@ -599,7 +608,8 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
   }
 
   Widget _buildUpcomingEventsList(BuildContext context) {
-    if (_reservations.isEmpty) {
+    final upcoming = _upcomingReservations;
+    if (upcoming.isEmpty) {
       return Card(
         color: Colors.white,
         child: Padding(
@@ -655,7 +665,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
       );
     }
 
-    final displayEvents = _reservations.take(3).toList();
+    final displayEvents = upcoming.take(3).toList();
     return Column(
       children: [
         for (final reservation in displayEvents)

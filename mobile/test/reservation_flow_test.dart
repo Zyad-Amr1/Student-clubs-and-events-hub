@@ -93,7 +93,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('My Events Calendar'));
+      await tester.tap(find.byKey(const ValueKey('open-calendar')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Waitlisted · position 2'), findsOneWidget);
       final calendarContext = tester.element(find.text('My Events Calendar'));

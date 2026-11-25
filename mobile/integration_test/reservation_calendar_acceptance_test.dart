@@ -6,6 +6,7 @@ import 'package:campusconnect/features/events/presentation/my_events_screen.dart
 import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'support/acceptance_fixture.dart';
 
@@ -46,7 +47,7 @@ void main() {
       await tester.pumpWidget(CampusConnectApp(api: api));
       await tester.pumpAndSettle();
       expect(find.byType(StudentHome), findsOneWidget);
-      await tester.tap(find.byTooltip('My Events Calendar'));
+      await tester.tap(find.byKey(const ValueKey('open-calendar')));
       await tester.pumpAndSettle();
       expect(find.byType(MyEventsScreen), findsOneWidget);
       expect(find.text(event.title), findsOneWidget);

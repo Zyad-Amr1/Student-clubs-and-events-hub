@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/club_details_screen.dart';
-import 'package:campusconnect/features/events/presentation/my_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ClubsScreen extends StatefulWidget {
@@ -147,7 +147,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar(
-              expandedHeight: 180,
+              expandedHeight: 105,
               pinned: true,
               backgroundColor: CampusColors.purple,
               foregroundColor: Colors.white,
@@ -159,7 +159,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       bottom: Radius.circular(28),
                     ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 40, 20, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -192,7 +192,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                                 ),
                               ),
                               Text(
-                                'Discover, follow, and join university clubs',
+                                'Discover and join university clubs',
                                 style: TextStyle(
                                   color: Color(0xFFECD6FC),
                                   fontSize: 13,
@@ -271,9 +271,21 @@ class _ClubsScreenState extends State<ClubsScreen> {
                         ),
                       ],
                     ),
-                    // Category chips
+                    // Keep exact category entry available for server-side filtering.
                     const SizedBox(height: 10),
                     _buildCategoryChips(),
+                    TextField(
+                      key: const ValueKey('club-category-filter'),
+                      controller: _categoryController,
+                      maxLength: 80,
+                      onChanged: (_) => _criteriaChanged(),
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: Icon(Icons.filter_list),
+                        counterText: '',
+                        isDense: true,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -292,8 +304,9 @@ class _ClubsScreenState extends State<ClubsScreen> {
                         message: _filtered
                             ? 'No clubs match your search and category.'
                             : 'No approved active clubs are available yet.',
-                        onRetry:
-                            _filtered ? _clearFilters : () => _load(reset: true),
+                        onRetry: _filtered
+                            ? _clearFilters
+                            : () => _load(reset: true),
                         actionLabel: _filtered ? 'Clear filters' : 'Refresh',
                       )
                     : RefreshIndicator(
@@ -307,11 +320,13 @@ class _ClubsScreenState extends State<ClubsScreen> {
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
-                                childAspectRatio: 0.82,
+                                mainAxisExtent: 260,
                               ),
                           itemCount:
                               _clubs.length +
-                              (_clubs.length < _total || _error != null ? 1 : 0),
+                              (_clubs.length < _total || _error != null
+                                  ? 1
+                                  : 0),
                           itemBuilder: (context, index) {
                             if (index == _clubs.length) {
                               return Center(
@@ -331,7 +346,9 @@ class _ClubsScreenState extends State<ClubsScreen> {
                                           ],
                                         )
                                       : TextButton(
-                                          key: const ValueKey('load-more-clubs'),
+                                          key: const ValueKey(
+                                            'load-more-clubs',
+                                          ),
                                           onPressed: _loadingMore
                                               ? null
                                               : () => _load(),
@@ -447,7 +464,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
             ),
             const SizedBox(height: 14),
             TextField(
-              key: const ValueKey('club-category-filter'),
+              key: const ValueKey('club-category-filter-sheet'),
               controller: _categoryController,
               maxLength: 80,
               onChanged: (_) => _criteriaChanged(),
@@ -517,8 +534,6 @@ class _ClubCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Verified badge
-                CampusVerifiedBadge(),
               ],
             ),
             const SizedBox(height: 10),
@@ -573,7 +588,7 @@ class _ClubCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Follow / Join button
+            // Open the club to see its real membership options.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -594,9 +609,9 @@ class _ClubCard extends StatelessWidget {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, size: 14),
+                    Icon(Icons.arrow_forward, size: 14),
                     SizedBox(width: 3),
-                    Text('Follow'),
+                    Text('View club'),
                   ],
                 ),
               ),
@@ -620,7 +635,7 @@ class _MessageState extends StatelessWidget {
   final String actionLabel;
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) => SingleChildScrollView(
     child: Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -642,10 +657,7 @@ class _MessageState extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: CampusColors.inkMuted,
-              fontSize: 15,
-            ),
+            style: const TextStyle(color: CampusColors.inkMuted, fontSize: 15),
           ),
           const SizedBox(height: 16),
           OutlinedButton(

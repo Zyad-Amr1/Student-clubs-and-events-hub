@@ -413,11 +413,13 @@ class CampusBottomNavigation extends StatelessWidget {
           label: 'Clubs',
         ),
         NavigationDestination(
+          key: ValueKey('open-calendar'),
           icon: Icon(Icons.calendar_month_outlined),
           selectedIcon: Icon(Icons.calendar_month, color: CampusColors.purple),
           label: 'Calendar',
         ),
         NavigationDestination(
+          key: ValueKey('open-profile'),
           icon: Icon(Icons.person_outline),
           selectedIcon: Icon(Icons.person, color: CampusColors.purple),
           label: 'Profile',
