@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Index, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -11,7 +11,10 @@ from app.database import Base
 
 class ClubAdministrator(Base):
     __tablename__ = "club_administrators"
-    __table_args__ = (Index("ix_club_administrators_user_id", "user_id"),)
+    __table_args__ = (
+        Index("ix_club_administrators_user_id", "user_id"),
+        UniqueConstraint("club_id", name="uq_club_administrators_club_id"),
+    )
 
     club_id: Mapped[UUID] = mapped_column(
         Uuid,
