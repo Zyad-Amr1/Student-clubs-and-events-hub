@@ -66,3 +66,136 @@ def test_club_head_race_rejection_reopening_and_assignment(draft_client, draft_t
                    {"club": club, "student": scenario["ids"][winner]})
     assert draft_client.get("/api/v1/auth/me/managed-clubs", headers=headers[loser]).json()["clubs"][0]["id"] == str(club)
     assert draft_client.get("/api/v1/auth/me", headers=headers[loser]).json()["account_type"] == "student"
+
+
+def test_concurrent_head_approval_and_rejection_has_one_transactional_winner(
+    draft_client, draft_test_engine, scenario,
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    club_id = ids["club"]
+    submitted = draft_client.post(f"/api/v1/clubs/{club_id}/head-requests",
+                                  headers=headers["student"])
+    assert submitted.status_code == 201, submitted.text
+    request_id = submitted.json()["id"]
+    path = f"/api/v1/student-affairs/club-head-requests/{request_id}/decision"
+    barrier = Barrier(2, timeout=10)
+
+    def decide(decision):
+        with TestClient(app) as client:
+            barrier.wait()
+            body = {"decision": decision}
+            if decision == "reject":
+                body["reason"] = "Selected another applicant."
+            return client.post(path, headers=headers["affairs"], json=body)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(decide, ("approve", "reject")))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+
+    with draft_test_engine.connect() as db:
+        request = db.execute(text(
+            "SELECT status, reason, reviewed_by, decided_at FROM club_head_requests WHERE id=:id"
+        ), {"id": request_id}).one()
+        grants = db.execute(text(
+            "SELECT user_id FROM club_administrators WHERE club_id=:club"
+        ), {"club": club_id}).scalars().all()
+    assert request.status == next(response.json()["status"] for response in responses
+                                  if response.status_code == 200)
+    assert request.reviewed_by == ids["affairs"] and request.decided_at is not None
+    if request.status == "approved":
+        assert request.reason is None and [str(user) for user in grants] == [str(ids["student"])]
+        expected_vacancy = "assigned"
+    else:
+        assert request.reason == "Selected another applicant." and grants == []
+        expected_vacancy = "open"
+    assert len(grants) <= 1
+    assert draft_client.get(f"/api/v1/clubs/{club_id}/head-vacancy",
+                            headers=headers["owner"]).json()["availability"] == expected_vacancy
+
+
+def test_club_head_application_racing_direct_assignment_has_one_winner(
+    draft_client, draft_test_engine, scenario,
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    club_id = ids["club"]
+    barrier = Barrier(2, timeout=10)
+
+    def apply():
+        with TestClient(app) as client:
+            barrier.wait()
+            return client.post(f"/api/v1/clubs/{club_id}/head-requests",
+                               headers=headers["student"])
+
+    def assign():
+        with TestClient(app) as client:
+            barrier.wait()
+            return client.put(f"/api/v1/auth/student-affairs/clubs/{club_id}/administrator",
+                              headers=headers["affairs"], json={"student_id": str(ids["owner"])})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        application_future, assignment_future = pool.submit(apply), pool.submit(assign)
+        application, assignment = application_future.result(), assignment_future.result()
+    assert (application.status_code, assignment.status_code) in {(201, 409), (409, 200)}
+
+    with draft_test_engine.connect() as db:
+        pending = db.execute(text(
+            "SELECT count(*) FROM club_head_requests WHERE club_id=:club AND status='pending'"
+        ), {"club": club_id}).scalar_one()
+        grants = db.execute(text(
+            "SELECT user_id FROM club_administrators WHERE club_id=:club"
+        ), {"club": club_id}).scalars().all()
+    assert pending + len(grants) == 1 and len(grants) <= 1
+    assert draft_client.get(f"/api/v1/clubs/{club_id}/head-vacancy",
+                            headers=headers["student"]).json()["availability"] == (
+                                "locked" if pending else "assigned"
+                            )
+    if assignment.status_code == 200:
+        assert [str(user) for user in grants] == [str(ids["owner"])]
+        assert draft_client.get(f"/api/v1/club-admin/clubs/{club_id}/applications",
+                                headers=headers["owner"]).status_code == 200
+    else:
+        assert application.status_code == 201 and grants == []
+        assert draft_client.get(f"/api/v1/club-admin/clubs/{club_id}/applications",
+                                headers=headers["owner"]).status_code == 404
+
+
+def test_pending_head_application_can_be_rejected_after_club_archival(
+    draft_client, draft_test_engine, scenario,
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    club_id = ids["club"]
+    submitted = draft_client.post(f"/api/v1/clubs/{club_id}/head-requests",
+                                  headers=headers["student"])
+    assert submitted.status_code == 201, submitted.text
+    club_path = f"/api/v1/student-affairs/clubs/{club_id}"
+    preview = draft_client.post(club_path + "/archive-preview", headers=headers["affairs"])
+    assert preview.status_code == 200, preview.text
+    archived = draft_client.post(club_path + "/archive", headers=headers["affairs"], json={
+        "reason": "Department closed", "preview_token": preview.json()["preview_token"],
+    })
+    assert archived.status_code == 200, archived.text
+
+    decision = f"/api/v1/student-affairs/club-head-requests/{submitted.json()['id']}/decision"
+    assert draft_client.post(decision, headers=headers["student"], json={
+        "decision": "reject", "reason": "Unauthorized",
+    }).status_code == 403
+    rejected = draft_client.post(decision, headers=headers["affairs"], json={
+        "decision": "reject", "reason": "Club archived: Department closed",
+    })
+    assert rejected.status_code == 200, rejected.text
+    assert rejected.json()["status"] == "rejected"
+    assert rejected.json()["reason"] == "Club archived: Department closed"
+    assert draft_client.get(f"/api/v1/clubs/{club_id}/head-vacancy",
+                            headers=headers["student"]).status_code == 404
+    with draft_test_engine.connect() as db:
+        request = db.execute(text(
+            "SELECT status, reason, reviewed_by, decided_at FROM club_head_requests WHERE id=:id"
+        ), {"id": submitted.json()["id"]}).one()
+        grants = db.execute(text(
+            "SELECT count(*) FROM club_administrators WHERE club_id=:club"
+        ), {"club": club_id}).scalar_one()
+        is_active = db.execute(text("SELECT is_active FROM clubs WHERE id=:club"),
+                               {"club": club_id}).scalar_one()
+    assert request.status == "rejected" and request.reason == "Club archived: Department closed"
+    assert request.reviewed_by == ids["affairs"] and request.decided_at is not None
+    assert grants == 0 and is_active is False

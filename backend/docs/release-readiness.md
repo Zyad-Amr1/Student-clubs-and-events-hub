@@ -49,17 +49,17 @@ The existing suite already covers the requested backend journeys. No duplicate j
 | CAMP-46 | `test_user_postgresql.py::test_registration_creates_only_student_without_returning_secrets`; `test_login_me_and_logout_revoke_session`; `test_account_management.py::test_private_profile_and_password_change` | Student registration, shared login, own profile and credential update | Flutter registration/login/profile and secure session acceptance |
 | CAMP-47 | `test_user_postgresql.py::test_login_me_and_logout_revoke_session`, `test_disabled_account_cannot_login`, `test_disabling_account_invalidates_existing_session` | Login, logout and session invalidation | Flutter secure persistence and restart acceptance |
 | CAMP-48 | `test_user_postgresql.py::test_postgresql_defaults_and_profile_updates`; `test_private_profile_and_password_change` | Profile reads and permitted edits | Flutter profile screen and validation |
-| CAMP-49 | `test_user_postgresql.py::test_student_affairs_can_use_same_login_without_self_registration`; `test_provision_student_affairs.py::*` | Student Affairs uses shared login and controlled provisioning | Flutter Affairs sign-in route and dashboard |
-| CAMP-50 | `test_user_postgresql.py::test_protected_endpoints_reject_missing_or_invalid_tokens`, `test_expired_and_unregistered_tokens_cannot_access_me`, `test_student_role_cannot_be_overridden_by_client` | Authenticated role checks and forged/missing token rejection | Flutter unauthorized and expired-session UX |
-| CAMP-51 | `test_user_postgresql.py::test_postgresql_rejects_duplicate_normalized_identifiers`, `test_registration_rejects_duplicates_atomically` | Normalized unique identifiers and duplicate registration rejection | Flutter field errors |
-| CAMP-52 | `test_user_postgresql.py::test_disabled_account_cannot_login`, `test_disabling_account_invalidates_existing_session`; `test_account_management.py::test_private_profile_and_password_change` | Account/profile security and session invalidation | Flutter account settings behavior |
-| CAMP-53 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
-| CAMP-54 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
-| CAMP-55 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
+| CAMP-49 | `test_account_management.py::test_private_profile_and_password_change`; `test_user_postgresql.py::test_postgresql_defaults_and_profile_updates` | Backend profile ownership, editable fields, persistence and password change; these tests do not establish avatar format/size and fallback behavior end to end | Flutter profile and avatar acceptance |
+| CAMP-50 | No backend test verifies a predefined faculty catalog or faculty-dependent department choices. Profile validation coverage is adjacent only. | Full dropdown/catalog behavior is not demonstrated | Flutter catalog/dropdown flow and backend faculty-department validation |
+| CAMP-51 | `test_account_management.py::test_private_profile_and_password_change`; `test_user_postgresql.py::test_login_me_and_logout_revoke_session` | Current-password verification, secure password update and server session logout | Flutter settings form and clearing local credentials |
+| CAMP-52 | `test_provision_student_affairs.py::*`; `test_affairs_cli_concurrency.py::test_concurrent_provisioning_creates_only_one_account`; `test_user_postgresql.py::test_student_affairs_can_use_same_login_without_self_registration`, `test_student_role_cannot_be_overridden_by_client`; `test_portal_access.py::*` | Secure single-account provisioning, shared login, server role checks and scoped club grants | Flutter Affairs dashboard and role-aware navigation |
+| CAMP-53 | Deferred. No implementation or acceptance evidence claimed. | Forgot-password email reset link | Explicitly deferred |
+| CAMP-54 | Deferred. No implementation or acceptance evidence claimed. | Email verification | Explicitly deferred |
+| CAMP-55 | Deferred. No implementation or acceptance evidence claimed. | Google Sign-In | Explicitly deferred |
 | CAMP-56 | `test_event_creation.py::test_archive_cancels_bookings_notices_admin_and_reactivation_keeps_cancellations`; `test_portal_access.py::test_archived_club_remains_visible_read_only_to_its_original_admin` | Archive status, reason and read-only archived access | Flutter archived status and reason display |
-| Club Head workflow | `test_club_head.py::test_club_head_race_rejection_reopening_and_assignment`; `test_student_affairs_singleton_includes_inactive_accounts` | One pending request/head per club, rejection reopening, approval assignment and database singleton | Flutter vacancy/application/review workflow |
+| Club Head workflow | `test_club_head.py::test_club_head_race_rejection_reopening_and_assignment`; targeted concurrency and archived-rejection tests in this branch | One pending request/head per club, rejection reopening, approval assignment and database singleton | Flutter vacancy/application/review workflow |
 
-CAMP-37–44 and CAMP-53–55 are explicitly deferred. Their partial or adjacent regression coverage is not acceptance evidence for those Stories.
+CAMP-37–44 and CAMP-53–55 are explicitly deferred. Their partial or adjacent regression coverage is not acceptance evidence for those Stories. CAMP-50 backend dropdown acceptance is also missing. Related profile tests do not establish its faculty catalog and dependent department behavior.
 
 The database-backed suite verifies the backend transitions. Android acceptance still needs a demo against the configured backend, especially the promoted-student refresh, calendar status synchronization and interview history screen. The existing endpoint returns reservation details through `GET /api/v1/me/reservations`; no separate backend calendar endpoint was found.
 
@@ -98,14 +98,14 @@ Run from the `backend` directory. Compare the printed host, port and database wi
 
 The provisioning command prints the database target and asks for exact confirmation. Enter the officer’s name, university email and ID, then enter the password at the hidden prompt. It refuses to create a second Student Affairs account. Keep the password in the operator’s password manager.
 
-Register realistic demo students with university email addresses and unique university IDs through the app or `POST /api/v1/auth/register`. Use a student to request a named club such as Robotics Society. Sign in as Student Affairs and approve it. The creator receives scoped Club Admin access. To demonstrate Club Head approval, use another student to apply to that active club, then approve the request as Student Affairs. Create a second club request/student pair if the demo needs to show rejection and vacancy reopening.
+Register realistic demo students with university email addresses and unique university IDs through the app or `POST /api/v1/auth/register`. Use a student to request a named club such as Robotics Society. Sign in as Student Affairs and approve it. The creator receives scoped Club Admin access. This club already has a Head assigned, so do not use it to demonstrate an open Head vacancy. For that demonstration, have a different student request a second club, approve the club, then have Student Affairs revoke the creator's administrator grant with `DELETE /api/v1/student-affairs/clubs/{club_id}/administrator`. This supported endpoint leaves the approved club active with no Head assigned. A student can then apply and Student Affairs can approve or reject the application. Create a second student-owned club request if the demo needs to show vacancy reopening after rejection.
 
 As the Robotics Society Club Admin, create and submit a future event with seat capacity one. Use a clear title such as `Robotics Showcase — FIFO Demo`. Student Affairs approves it. Student A reserves the seat and Student B joins the waitlist. Student A cancels. Student B refreshes the app and sees the reservation promoted to confirmed. Confirm reservation details and state through `GET /api/v1/me/reservations` for each student's own login.
 
 Start the API from `backend` with `.env` pointing at the demo database:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Keep the backend bound to localhost. For the Android emulator, configure the app's API base URL as `http://10.0.2.2:8000`. Check `http://127.0.0.1:8000/health` and `http://127.0.0.1:8000/api/v1/health/db` from the host. No LAN firewall rule is needed for the emulator's host loopback mapping.
