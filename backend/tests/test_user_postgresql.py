@@ -1,9 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
 import jwt
 
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.auth.accounts import DuplicateAccountError, create_account
 from app.auth.passwords import hash_password, verify_password
 from app.auth.schemas import AccountCreationInput
@@ -197,6 +202,44 @@ def test_registration_rejects_duplicates_atomically(registration_client, changes
     duplicate = registration_client.post("/api/v1/auth/register", json=registration_body(**changes))
     assert duplicate.status_code == 409
     assert duplicate.json() == {"detail": "An account with these details already exists"}
+
+
+@pytest.mark.parametrize("conflict", ["email", "university_id"])
+def test_concurrent_registration_uniqueness(registration_client, migrated_engine, conflict):
+    """CAMP-59: two concurrent requests may create only one canonical account."""
+    first = registration_body()
+    second = registration_body(
+        email="student@example.edu" if conflict == "email" else "other@example.edu",
+        university_id="SECOND-ID" if conflict == "email" else "AB-123",
+    )
+    start = Barrier(2, timeout=10)
+
+    def register(payload):
+        with TestClient(app) as client:
+            start.wait()
+            return client.post("/api/v1/auth/register", json=payload)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(register, (first, second)))
+
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    winner = next(response.json() for response in responses if response.status_code == 201)
+    loser = next(response for response in responses if response.status_code == 409)
+    assert loser.json() == {"detail": "An account with these details already exists"}
+    assert winner["account_type"] == "student"
+    for response in responses:
+        assert first["password"] not in response.text
+        assert "password_hash" not in response.text
+
+    with Session(migrated_engine) as session:
+        stored = session.query(User).all()
+        assert len(stored) == 1
+        account = stored[0]
+        assert str(account.id) == winner["id"]
+        assert account.email == winner["email"]
+        assert account.university_id == winner["university_id"]
+        assert account.account_type is AccountType.STUDENT
+        assert verify_password(first["password"], account.password_hash)
 
 
 @pytest.mark.parametrize(
