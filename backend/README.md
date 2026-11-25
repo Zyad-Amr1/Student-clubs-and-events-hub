@@ -361,3 +361,69 @@ club-administrator assignment API. The event is never made public merely by
 creation or submission. The feature adds **no new database migration** beyond
 CAMP-10's `0005_club_administrators`, and is currently a stacked PR pending
 that prerequisite's integration.
+
+## Student event reservations (CAMP-14–17)
+
+All routes below require a current bearer session for an active **Student**.
+Student Affairs accounts receive HTTP 403; missing, invalid, expired, revoked,
+or inactive-user sessions receive HTTP 401. Club Admins remain Students and
+may reserve events as students.
+
+### Reserve a seat or join the waitlist
+
+`POST /api/v1/events/{event_id}/reservations` has no request body. The event
+must belong to an active approved club and be both approved and published, with
+a start time in the future. A free seat returns HTTP 201 with `status:
+"confirmed"`; a full event returns HTTP 201 with `status: "waitlisted"` and a
+1-based `waitlist_position`. A duplicate active reservation returns HTTP 409;
+an unknown or unavailable event returns HTTP 404.
+
+```json
+{
+  "event_id": "<event-uuid>",
+  "status": "waitlisted",
+  "waitlist_position": 2,
+  "event": {
+    "id": "<event-uuid>",
+    "club_id": "<club-uuid>",
+    "title": "Engineering Workshop",
+    "description": "Practical robotics session",
+    "venue": "Engineering Hall",
+    "starts_at": "2030-05-10T10:00:00Z",
+    "ends_at": "2030-05-10T12:00:00Z",
+    "seat_capacity": 40
+  }
+}
+```
+
+### Cancel a reservation
+
+`DELETE /api/v1/events/{event_id}/reservations` cancels only the authenticated
+Student's own reservation. It returns HTTP 204 on success and HTTP 404 when
+that Student has no reservation for the event. Cancelling a waitlist entry does
+not release a confirmed seat. Cancelling a confirmed reservation promotes the
+earliest active Student still on the waitlist in the same transaction, while
+the event remains available and in the future. Started events do not promote
+waitlisted students.
+
+### Read the current Student's reservations
+
+`GET /api/v1/me/reservations` returns only the authenticated Student's active
+confirmed and waitlisted reservations. The `reservations` array uses the same
+object shape shown above; event details include the event and club UUID, title,
+description, venue, start/end time, and seat capacity. Confirmed entries have
+`waitlist_position: null`; waitlisted entries have their current 1-based
+position among active Student waitlist entries. Results are ordered by event
+start time.
+
+### Persistence and concurrency
+
+Alembic revision `0007_event_reservations` follows
+`0006_one_admin_per_club`. It creates one table with a unique
+`(event_id, user_id)` constraint, foreign keys to events and users, a checked
+confirmed/waitlisted state, and a PostgreSQL identity value used as persisted
+FIFO order. RSVP and cancellation lock the event row before reading or changing
+seat counts. Promotion updates the earliest eligible queue entry and commits
+with the cancellation, so concurrent requests cannot oversubscribe a published
+event through these APIs. Cancelling deletes the active reservation row, which
+allows the Student to register again later.
