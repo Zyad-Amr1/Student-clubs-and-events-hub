@@ -49,9 +49,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
     Navigator.of(context)
         .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
     if (warning != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(warning)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(warning)));
     }
   }
 
