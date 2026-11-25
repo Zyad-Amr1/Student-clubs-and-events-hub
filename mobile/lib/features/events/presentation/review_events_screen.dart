@@ -60,11 +60,12 @@ class _ReviewEventsScreenState extends State<ReviewEventsScreen> {
     } catch (_) {
       if (mounted) setState(() => _error = 'Could not load pending events.');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _loadingMore = false;
         });
+      }
     }
   }
 
