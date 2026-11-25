@@ -338,3 +338,56 @@ def test_submit_endpoint_openapi_auth_contract():
     assert operation["security"] == [{"HTTPBearer": []}]
     assert {"200", "401", "403", "404", "409", "422"} <= set(operation["responses"])
     assert {p["name"] for p in operation["parameters"]} == {"club_id", "event_id"}
+
+
+@pytest.mark.parametrize("approval_state", ["pending", "rejected"])
+def test_unapproved_active_club_cannot_submit_existing_draft(
+    draft_client, draft_test_engine, scenario, owned_draft, approval_state
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text("UPDATE clubs SET approval_status=:state WHERE id=:id"),
+            {"state": approval_state, "id": ids["club"]},
+        )
+    result = submit(draft_client, ids["club"], owned_draft["id"], headers["owner"])
+    assert result.status_code == 404
+    assert result.json() == {"detail": "Club or event not found"}
+    assert state(draft_test_engine, owned_draft["id"]).approval_status == "draft"
+    # Membership is not deleted merely because approval was withdrawn.
+    with draft_test_engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM club_administrators WHERE club_id=:id"),
+            {"id": ids["club"]},
+        ).scalar_one() == 1
+    # A previously verified Student cannot create another draft either.
+    denied = draft_client.post(
+        f"/api/v1/clubs/{ids['club']}/events",
+        headers=headers["owner"],
+        json=payload(),
+    )
+    assert denied.status_code == 404
+
+
+def test_club_admin_access_requires_current_approval_at_submission_time(
+    draft_client, draft_test_engine, scenario, owned_draft
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    before = submit(draft_client, ids["club"], owned_draft["id"], headers["student"])
+    assert before.status_code == 404
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text("UPDATE clubs SET approval_status='rejected' WHERE id=:id"),
+            {"id": ids["club"]},
+        )
+    rejected = submit(draft_client, ids["club"], owned_draft["id"], headers["owner"])
+    assert rejected.status_code == 404
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text("UPDATE clubs SET approval_status='approved' WHERE id=:id"),
+            {"id": ids["club"]},
+        )
+    allowed = submit(draft_client, ids["club"], owned_draft["id"], headers["owner"])
+    assert allowed.status_code == 200
+    assert allowed.json()["approval_status"] == "pending"
+    assert allowed.json()["is_published"] is False

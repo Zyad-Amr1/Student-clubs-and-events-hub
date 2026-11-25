@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthenticatedIdentity, current_identity
 from app.database import get_db
 from app.events.schemas import DraftEventCreate, DraftEventResponse
-from app.models.club import Club
+from app.models.club import Club, ClubApprovalStatus
 from app.models.club_administrator import ClubAdministrator
 from app.models.event import Event, EventApprovalStatus
 from app.models.user import AccountType
@@ -47,6 +47,7 @@ def create_draft_event(
         .where(
             Club.id == club_id,
             Club.is_active.is_(True),
+            Club.approval_status == ClubApprovalStatus.APPROVED,
             ClubAdministrator.user_id == identity.user.id,
         )
         .with_for_update(of=(Club, ClubAdministrator))
@@ -145,6 +146,7 @@ def submit_draft_event(
         .where(
             Club.id == club_id,
             Club.is_active.is_(True),
+            Club.approval_status == ClubApprovalStatus.APPROVED,
             ClubAdministrator.user_id == identity.user.id,
             Event.club_id == club_id,
             Event.id == event_id,
