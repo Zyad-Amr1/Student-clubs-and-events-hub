@@ -253,14 +253,37 @@ class StudentSession extends ChangeNotifier {
 
   Future<void> logout() async {
     final previousToken = _token;
-    // Always remove local credentials, even if the server is unavailable.
-    await _dropLocalSession();
+    bool storageFailed = false;
+    bool revocationFailed = false;
+
+    // First invalidate the *in-memory* identity, whether secure storage works
+    // or not. Never keep a locally privileged session after sign-out.
+    try {
+      await _dropLocalSession();
+    } catch (_) {
+      storageFailed = true;
+    }
+
+    // Revocation must always be attempted, even if Android Keystore throws.
     if (previousToken != null) {
       try {
         await api.logout(previousToken);
-      } on ApiFailure {
-        // Locally signed out; remote revocation may require retrying server-side.
+      } catch (_) {
+        revocationFailed = true;
       }
+    }
+
+    if (storageFailed) {
+      throw const ApiFailure(
+        'Secure sign-out is incomplete: saved credentials could not be '
+        'removed. Clear the application data before using this device again.',
+      );
+    }
+    if (revocationFailed) {
+      throw const ApiFailure(
+        'Signed out on this device, but server revocation could not be '
+        'confirmed. The server session may remain active until expiry.',
+      );
     }
   }
 }

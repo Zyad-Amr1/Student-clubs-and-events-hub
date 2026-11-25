@@ -39,10 +39,20 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Future<void> _logout() async {
-    await StudentSessionScope.of(context).logout();
+    String? warning;
+    try {
+      await StudentSessionScope.of(context).logout();
+    } on ApiFailure catch (error) {
+      warning = error.message;
+    }
     if (!mounted) return;
     Navigator.of(context)
         .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+    if (warning != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(warning)),
+      );
+    }
   }
 
   @override

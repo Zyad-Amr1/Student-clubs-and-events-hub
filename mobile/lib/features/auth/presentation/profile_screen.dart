@@ -1,5 +1,6 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
+import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,13 +15,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _logout() async {
     setState(() => _loggingOut = true);
+    String? warning;
     try {
       await StudentSessionScope.of(context).logout();
-    } finally {
-      if (mounted) {
-        Navigator.of(context)
-            .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
-      }
+    } on ApiFailure catch (error) {
+      warning = error.message;
+    }
+    if (!mounted) return;
+    Navigator.of(context)
+        .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+    if (warning != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(warning)),
+      );
     }
   }
 

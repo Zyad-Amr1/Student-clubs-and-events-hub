@@ -11,6 +11,7 @@ class PortalMemoryStore implements TokenStore, PortalPreferenceStore {
   String? token;
   String? portal;
   int clears = 0;
+  bool failClear = false;
 
   @override
   Future<String?> read() async => token;
@@ -30,6 +31,7 @@ class PortalMemoryStore implements TokenStore, PortalPreferenceStore {
 
   @override
   Future<void> clear() async {
+    if (failClear) throw StateError('Simulated secure storage failure');
     token = null;
     portal = null;
     clears++;
@@ -42,6 +44,8 @@ class PortalTransport implements ApiTransport {
   String accountType;
   bool allowClub = true;
   bool allowAffairs = true;
+  bool failLogout = false;
+  bool sessionRevoked = false;
   final List<String> paths = [];
 
   @override
@@ -59,6 +63,9 @@ class PortalTransport implements ApiTransport {
       );
     }
     if (uri.path == '/api/v1/auth/me') {
+      if (sessionRevoked) {
+        return const ApiReply(401, '{"detail":"Invalid or expired session"}');
+      }
       return ApiReply(
         200,
         jsonEncode({
@@ -86,6 +93,10 @@ class PortalTransport implements ApiTransport {
           : const ApiReply(403, '{"detail":"Insufficient permissions"}');
     }
     if (uri.path == '/api/v1/auth/logout') {
+      if (failLogout) {
+        return const ApiReply(503, '{"detail":"Unavailable"}');
+      }
+      sessionRevoked = true;
       return const ApiReply(204, '');
     }
     return const ApiReply(404, '{"detail":"Not found"}');
@@ -309,4 +320,73 @@ void main() {
     expect(find.text('Student Affairs access verified'), findsOneWidget);
     expect(find.text('Verified Robotics Club'), findsNothing);
   });
+  test('Normal logout clears storage, in-memory identity and revokes JWT', () async {
+    final backend = PortalTransport();
+    final store = PortalMemoryStore();
+    final session = StudentSession(api: portalApi(backend), store: store);
+    await session.signIn('student@example.edu', 'password');
+    await session.logout();
+    expect(session.signedIn, false);
+    expect(store.token, isNull);
+    expect(store.clears, 1);
+    expect(backend.sessionRevoked, true);
+    expect(backend.paths.last, '/api/v1/auth/logout');
+    session.dispose();
+  });
+
+  test('Secure-storage failure still revokes server token and invalidates memory', () async {
+    final backend = PortalTransport();
+    final store = PortalMemoryStore();
+    final session = StudentSession(api: portalApi(backend), store: store);
+    await session.signIn('admin@example.edu', 'password', portal: PortalRole.clubAdmin);
+    store.failClear = true;
+    await expectLater(
+      session.logout(),
+      throwsA(isA<ApiFailure>().having((e) => e.message, 'message', contains('saved credentials'))),
+    );
+    expect(session.signedIn, false);
+    expect(backend.paths.last, '/api/v1/auth/logout');
+    expect(backend.sessionRevoked, true);
+    expect(store.token, isNotNull); // Failure remains visible; never claim clear.
+    // The persisted token cannot restore privilege after successful revocation.
+    store.failClear = false;
+    final restarted = StudentSession(api: portalApi(backend), store: store);
+    await restarted.restore();
+    expect(restarted.signedIn, false);
+    expect(store.token, isNull);
+    restarted.dispose();
+    session.dispose();
+  });
+
+  test('Backend failure cannot preserve an authenticated in-memory session', () async {
+    final backend = PortalTransport()..failLogout = true;
+    final store = PortalMemoryStore();
+    final session = StudentSession(api: portalApi(backend), store: store);
+    await session.signIn('student@example.edu', 'password');
+    await expectLater(
+      session.logout(),
+      throwsA(isA<ApiFailure>().having((e) => e.message, 'message', contains('server revocation'))),
+    );
+    expect(session.signedIn, false);
+    expect(store.token, isNull);
+    expect(store.clears, 1);
+    expect(backend.paths.last, '/api/v1/auth/logout');
+    session.dispose();
+  });
+
+  test('Storage and backend failures are both handled without token exposure', () async {
+    final backend = PortalTransport()..failLogout = true;
+    final store = PortalMemoryStore();
+    final session = StudentSession(api: portalApi(backend), store: store);
+    await session.signIn('student@example.edu', 'password');
+    store.failClear = true;
+    await expectLater(
+      session.logout(),
+      throwsA(isA<ApiFailure>().having((e) => e.message, 'message', contains('Secure sign-out is incomplete'))),
+    );
+    expect(session.signedIn, false);
+    expect(backend.paths.last, '/api/v1/auth/logout');
+    session.dispose();
+  });
+
 }
