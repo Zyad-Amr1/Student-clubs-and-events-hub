@@ -66,11 +66,10 @@ void main() {
       expect(find.text('Confirmed'), findsOneWidget);
       expect(find.text('Cancel reservation'), findsOneWidget);
 
-      final aAfter = (await api.myReservations(studentA.token))
-          .singleWhere((item) => item.event.id == event.id);
+      final aAfter = await api.myReservations(studentA.token);
       final bAfter = (await api.myReservations(studentB.token))
           .singleWhere((item) => item.event.id == event.id);
-      expect(aAfter.status, ReservationStatus.cancelled);
+      expect(aAfter.where((item) => item.event.id == event.id), isEmpty);
       expect(bAfter.status, ReservationStatus.confirmed);
       expect(bAfter.waitlistPosition, isNull);
     },

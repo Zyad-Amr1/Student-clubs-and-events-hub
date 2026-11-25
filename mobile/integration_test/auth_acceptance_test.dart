@@ -92,8 +92,11 @@ void main() {
       expect(find.byType(StudentHome), findsOneWidget);
       expect(await store.read(), token);
 
-      await tester.tap(find.byKey(const ValueKey('open-profile')));
+      await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('header-open-profile')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('profile-name')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('profile-logout')));
       await tester.pumpAndSettle();
       expect(await store.read(), isNull);
@@ -123,8 +126,11 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('auth-submit')));
       await tester.pumpAndSettle();
       expect(find.byType(StudentHome), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('open-profile')));
+      await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('header-open-profile')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('profile-name')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('profile-logout')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('open-auth')));
