@@ -181,7 +181,7 @@ def test_unapproved_club_never_leaks_through_spoofed_admin_query(
     assert post_event(draft_client, ids["club"], payload(), headers["owner"]).status_code == 404
 
 
-def test_second_affairs_provisioning_is_blocked_before_password_prompt(
+def test_second_affairs_provisioning_is_blocked_before_account_creation(
     draft_client, draft_test_engine, scenario, monkeypatch, capsys
 ):
     from app.auth import provision_student_affairs as cli
@@ -190,11 +190,13 @@ def test_second_affairs_provisioning_is_blocked_before_password_prompt(
     monkeypatch.setattr(cli, "_confirm_target_database", lambda: True)
     monkeypatch.setattr(cli, "get_engine", lambda: draft_test_engine)
 
-    def unexpected_prompt(*args, **kwargs):
-        raise AssertionError("An existing account must not trigger credential prompts")
-
-    monkeypatch.setattr("builtins.input", unexpected_prompt)
-    monkeypatch.setattr(cli, "getpass", unexpected_prompt)
+    prompts = iter([
+        "Temporary Staff",
+        "temporary-staff@example.edu",
+        "TEMP-STAFF",
+    ])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(prompts))
+    monkeypatch.setattr(cli, "getpass", lambda prompt: "TemporaryStaffPassword#123")
     assert cli.main([]) == 1
     captured = capsys.readouterr()
     assert "already exists" in captured.err

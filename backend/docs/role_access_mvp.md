@@ -29,7 +29,7 @@ Only the interactive trusted CLI `python -m app.auth.provision_student_affairs`
 may provision the MVP account. Its resolved target database is explicitly
 displayed and must be typed back; environment `DATABASE_URL` can override
 `.env`. The CLI checks the database for an existing Student Affairs account
-before prompting for credentials and again before inserting. It refuses to
+after validating interactive account input, before inserting. It refuses to
 create a second account. **This is not a concurrency-proof database singleton
 constraint**; no new account-type migration was introduced.
 

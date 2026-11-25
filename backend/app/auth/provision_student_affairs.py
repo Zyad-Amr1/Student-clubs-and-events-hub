@@ -84,16 +84,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not _confirm_target_database():
         return 1
 
-    # Fail early before requesting any password or account information.
-    try:
-        with Session(get_engine()) as db:
-            if _student_affairs_exists(db):
-                _refuse_second_account()
-                return 1
-    except (DatabaseConfigurationError, ImportError, SQLAlchemyError, ValueError):
-        print("Provisioning failed. Check database configuration and availability.", file=sys.stderr)
-        return 1
-
     try:
         full_name = input("Full name: ")
         email = input("Email: ")
@@ -115,8 +105,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         with Session(get_engine()) as db:
-            # Reduce a second-provisioning race after the interactive prompt.
-            # This is deliberately an operational check, not a DB singleton.
+            # Check the operational singleton before insertion, after the
+            # existing input validation. Not a DB-wide concurrent singleton.
             if _student_affairs_exists(db):
                 _refuse_second_account()
                 return 1
