@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/interview_screens.dart';
 import 'package:material_ui/material_ui.dart';
@@ -138,22 +139,24 @@ class _MembershipScreenState extends State<MembershipScreen> {
               const Text('Sign in again to see applications.')
             else ...[
               if (admin)
-                Text(
+                CampusHeader(
                   widget.club!.name,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  'Review applications and decide which students need an interview.',
+                  icon: Icons.assignment_outlined,
                 ),
               if (_busy) const LinearProgressIndicator(),
-              if (_error != null) ...[
-                Text(_error!),
-                TextButton(
-                  onPressed: _busy ? null : () => _load(reset: true),
-                  child: const Text('Retry'),
-                ),
-              ] else if (!_busy && _items.isEmpty)
-                Text(
+              if (_error != null)
+                CampusFeedback(
+                  _error!,
+                  icon: Icons.error_outline,
+                  retry: _busy ? null : () => _load(reset: true),
+                )
+              else if (!_busy && _items.isEmpty)
+                CampusFeedback(
                   widget.memberships
                       ? 'You have no accepted memberships yet.'
                       : 'No applications yet.',
+                  icon: Icons.inbox_outlined,
                 ),
               for (final application in _items)
                 Card(
@@ -168,7 +171,10 @@ class _MembershipScreenState extends State<MembershipScreen> {
                               : application.clubName,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        Text(application.statusLabel),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: CampusStatus(application.statusLabel),
+                        ),
                         if (!admin &&
                             application.status == 'interview_required')
                           TextButton(

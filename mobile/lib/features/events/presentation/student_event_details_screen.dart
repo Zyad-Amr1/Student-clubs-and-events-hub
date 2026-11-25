@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
@@ -133,34 +134,34 @@ class _StudentEventDetailsScreenState extends State<StudentEventDetailsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Text(
+            CampusHeader(
               event.title,
-              style: Theme.of(context).textTheme.headlineMedium,
+              eventTime(context, event.startsAt),
+              icon: Icons.event_outlined,
             ),
-            const SizedBox(height: 12),
-            Text(event.description),
-            const SizedBox(height: 12),
-            Text('Venue: ${event.venue}'),
-            Text('Starts: ${eventTime(context, event.startsAt)}'),
-            if (event.endsAt case final end?)
-              Text('Ends: ${eventTime(context, end)}'),
-            Text('Capacity: ${event.seatCapacity}'),
+            const SizedBox(height: 8),
             if (event.cancelledAt != null)
-              Text(
+              CampusFeedback(
                 'Cancelled: ${event.cancellationReason ?? 'No reason provided'}',
+                icon: Icons.error_outline,
               ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            const CampusSectionHeader(title: 'Your reservation'),
             if (_busy)
               const LinearProgressIndicator()
-            else if (_error case final error?) ...[
-              Text(error),
-              TextButton(
-                onPressed: _refresh,
-                child: const Text('Retry status'),
+            else if (_error case final error?)
+              CampusFeedback(
+                error,
+                icon: Icons.error_outline,
+                retry: _refresh,
+                retryLabel: 'Retry status',
               ),
-            ] else if (_hasState)
+            if (!_busy && _error == null && _hasState)
               if (reservation != null) ...[
-                Text(reservationLabel(reservation)),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CampusStatus(reservationLabel(reservation)),
+                ),
                 const SizedBox(height: 8),
                 if (reservation.status != ReservationStatus.cancelled)
                   OutlinedButton(
@@ -168,7 +169,7 @@ class _StudentEventDetailsScreenState extends State<StudentEventDetailsScreen> {
                     child: const Text('Cancel reservation'),
                   ),
               ] else if (hasStarted)
-                const Text(
+                const CampusFeedback(
                   'Reservations are closed because the event has started.',
                 )
               else
@@ -176,6 +177,40 @@ class _StudentEventDetailsScreenState extends State<StudentEventDetailsScreen> {
                   onPressed: () => _run(reserve: true),
                   child: const Text('Reserve a place'),
                 ),
+            const SizedBox(height: 12),
+            const CampusSectionHeader(title: 'About this event'),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.description,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    CampusDetailRow(Icons.place_outlined, 'Venue', event.venue),
+                    CampusDetailRow(
+                      Icons.schedule_outlined,
+                      'Starts',
+                      eventTime(context, event.startsAt),
+                    ),
+                    if (event.endsAt case final end?)
+                      CampusDetailRow(
+                        Icons.schedule_outlined,
+                        'Ends',
+                        eventTime(context, end),
+                      ),
+                    CampusDetailRow(
+                      Icons.groups_outlined,
+                      'Capacity',
+                      '${event.seatCapacity}',
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -189,13 +224,22 @@ class ReservationSignInScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Student sign-in')),
-    body: Center(
-      child: FilledButton(
-        onPressed: () => Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRoutes.authentication, (route) => false),
-        child: const Text('Sign in to view reservations'),
-      ),
+    body: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const CampusHeader(
+          'Your reservations',
+          'Sign in with your campus account to manage your event reservations.',
+          icon: Icons.confirmation_num_outlined,
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: () => Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil(AppRoutes.authentication, (route) => false),
+          child: const Text('Sign in to view reservations'),
+        ),
+      ],
     ),
   );
 }

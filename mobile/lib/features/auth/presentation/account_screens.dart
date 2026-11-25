@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
@@ -95,16 +96,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     T? value,
     Iterable<T> values,
     ValueChanged<T?> change,
-  ) => DropdownButton<T>(
-    isExpanded: true,
-    value: values.contains(value) ? value : null,
-    hint: Text(label),
-    items: [
-      const DropdownMenuItem(value: null, child: Text('Not specified')),
-      for (final item in values)
-        DropdownMenuItem(value: item, child: Text('$item')),
-    ],
-    onChanged: _busy ? null : change,
+  ) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: InputDecorator(
+      decoration: InputDecoration(labelText: label, enabled: !_busy),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          isExpanded: true,
+          isDense: true,
+          value: values.contains(value) ? value : null,
+          hint: const Text('Not specified'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Not specified')),
+            for (final item in values)
+              DropdownMenuItem(value: item, child: Text('$item')),
+          ],
+          onChanged: _busy ? null : change,
+        ),
+      ),
+    ),
   );
 
   @override
@@ -114,16 +124,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       future: _catalog,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${snapshot.error}'),
-                TextButton(
-                  onPressed: () => setState(_loadCatalog),
-                  child: const Text('Retry'),
-                ),
-              ],
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: CampusFeedback(
+              '${snapshot.error}',
+              icon: Icons.error_outline,
+              retry: () => setState(_loadCatalog),
             ),
           );
         }
@@ -138,30 +144,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Center(
-              child: UploadedImage(
-                _changedImage ? null : widget.profile.picture,
+            Card(
+              color: CampusColors.lavender,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    UploadedImage(
+                      _changedImage
+                          ? (_image == null
+                                ? null
+                                : 'data:image/jpeg;base64,$_image')
+                          : widget.profile.picture,
+                    ),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: _busy ? null : _pick,
+                          child: Text(
+                            _image == null
+                                ? 'Choose picture'
+                                : 'Picture selected',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => setState(() {
+                                  _changedImage = true;
+                                  _image = null;
+                                }),
+                          child: const Text('Remove picture'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            Wrap(
-              children: [
-                TextButton(
-                  onPressed: _busy ? null : _pick,
-                  child: Text(
-                    _image == null ? 'Choose picture' : 'Picture selected',
-                  ),
-                ),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => setState(() {
-                          _changedImage = true;
-                          _image = null;
-                        }),
-                  child: const Text('Remove picture'),
-                ),
-              ],
-            ),
+            const CampusSectionHeader(title: 'Personal information'),
             TextField(
               controller: _name,
               maxLength: 120,
@@ -170,7 +192,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             Text('Email · ${widget.profile.email}'),
             Text('University ID · ${widget.profile.universityId}'),
-            const Text('Faculty'),
+            const SizedBox(height: 12),
+            const CampusSectionHeader(title: 'Academic information'),
             _dropdown(
               'Faculty',
               _faculty,
@@ -182,21 +205,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 }
               }),
             ),
-            const Text('Department'),
             _dropdown(
               'Department',
               _department,
               departments,
               (value) => setState(() => _department = value),
             ),
-            const Text('Academic year'),
             _dropdown(
               'Academic year',
               _year,
               years,
               (value) => setState(() => _year = value),
             ),
-            if (_error != null) Text(_error!),
+            if (_error != null)
+              CampusFeedback(_error!, icon: Icons.error_outline),
             FilledButton(
               onPressed: _busy ? null : _save,
               child: const Text('Save profile'),
@@ -291,29 +313,35 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           if (!signedIn)
             const Text('Sign in again to change your password.')
           else ...[
+            const CampusSectionHeader(title: 'Password'),
             for (final entry in {
               'Current password': _current,
               'New password': _new,
               'Confirm new password': _confirm,
             }.entries)
-              TextField(
-                controller: entry.value,
-                enabled: !_busy,
-                obscureText: true,
-                maxLength: 128,
-                autocorrect: false,
-                enableSuggestions: false,
-                decoration: InputDecoration(
-                  labelText: entry.key,
-                  counterText: '',
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: entry.value,
+                  enabled: !_busy,
+                  obscureText: true,
+                  maxLength: 128,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: InputDecoration(
+                    labelText: entry.key,
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  ),
                 ),
               ),
-            if (_message != null) Text(_message!),
+            if (_message != null) CampusFeedback(_message!),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _busy ? null : _change,
               child: const Text('Change password'),
             ),
+            const SizedBox(height: 10),
             OutlinedButton(
               onPressed: _busy ? null : _logout,
               child: const Text('Sign out'),

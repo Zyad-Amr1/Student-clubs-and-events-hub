@@ -3,7 +3,7 @@
     <application
         android:label="CampusConnect"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/campus_launcher"
         android:allowBackup="false">
         <activity
             android:name=".MainActivity"

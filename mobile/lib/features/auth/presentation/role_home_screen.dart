@@ -1,5 +1,6 @@
 import 'package:campusconnect/features/clubs/presentation/club_head_screen.dart';
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
@@ -87,19 +88,20 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
       appBar: AppBar(title: Text('${widget.portal.label} portal')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           children: [
-            Text(
+            CampusHeader(
               session.profile?.fullName ?? '',
-              style: Theme.of(context).textTheme.titleLarge,
+              admin
+                  ? 'Manage your assigned clubs and their events.'
+                  : 'Student Affairs access verified',
+              icon: admin
+                  ? Icons.groups_outlined
+                  : Icons.verified_user_outlined,
             ),
-            const SizedBox(height: 8),
-            Text(
-              admin ? 'Your assigned clubs are verified by CampusConnect.' : 'Your Student Affairs account has been verified by CampusConnect.',
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             if (admin) ...[
-              TextButton(
+              OutlinedButton.icon(
                 onPressed: _checking
                     ? null
                     : () async {
@@ -123,20 +125,19 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                           if (mounted) setState(() => _checking = false);
                         }
                       },
-                child: const Text('Switch Back to Student Mode'),
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text('Switch Back to Student Mode'),
               ),
-              Text(
-                'Clubs you administer',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
+              const CampusSectionHeader(title: 'Clubs you administer'),
+              if (session.managedClubs.isEmpty)
+                const CampusFeedback('No clubs are assigned to this account.'),
               for (final club in session.managedClubs)
                 Card(
                   child: Column(
                     children: [
                       ListTile(
                         key: ValueKey('managed-club-${club.id}'),
-                        leading: const Icon(Icons.groups_outlined),
+                        leading: const CampusIconTile(Icons.groups_outlined),
                         title: Text(club.name),
                         subtitle: Text(
                           club.isActive
@@ -154,89 +155,60 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                               )
                             : null,
                       ),
-                      if (club.isActive)
-                        TextButton(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<bool>(
-                              builder: (_) => ManagedClubProfileScreen(club.id),
-                            ),
-                          ),
-                          child: const Text('Edit Club Profile'),
+                      if (club.isActive) ...[
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        _PortalAction(
+                          'Edit Club Profile',
+                          Icons.edit_outlined,
+                          (_) => ManagedClubProfileScreen(club.id),
                         ),
-                      if (club.isActive)
-                        TextButton(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => MembershipScreen(club: club),
-                            ),
-                          ),
-                          child: const Text('Membership Applications'),
+                        _PortalAction(
+                          'Membership Applications',
+                          Icons.assignment_outlined,
+                          (_) => MembershipScreen(club: club),
                         ),
-                      if (club.isActive)
-                        TextButton(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => AdminInterviewDaysScreen(club),
-                            ),
-                          ),
-                          child: const Text('Interview Days'),
+                        _PortalAction(
+                          'Interview Days',
+                          Icons.event_available_outlined,
+                          (_) => AdminInterviewDaysScreen(club),
                         ),
+                      ],
                     ],
                   ),
                 ),
-            ] else
-              const Card(
-                child: ListTile(
-                  leading: Icon(Icons.verified_user_outlined),
-                  title: Text('Student Affairs access verified'),
-                  subtitle: Text('Review submitted events for publication'),
+            ] else ...[
+              const CampusSectionHeader(title: 'Review and manage'),
+              Card(
+                child: Column(
+                  children: [
+                    _PortalAction(
+                      'Review pending events',
+                      Icons.fact_check_outlined,
+                      (_) => const ReviewEventsScreen(),
+                      key: const ValueKey('open-pending-review'),
+                    ),
+                    _PortalAction(
+                      'Review Club Requests',
+                      Icons.assignment_outlined,
+                      (_) => const ClubRequestsScreen(review: true),
+                    ),
+                    _PortalAction(
+                      'Review Club Head Requests',
+                      Icons.badge_outlined,
+                      (_) => const ClubHeadScreen(review: true),
+                    ),
+                    _PortalAction(
+                      'Manage Club Lifecycle',
+                      Icons.groups_outlined,
+                      (_) => const ClubLifecycleScreen(),
+                    ),
+                  ],
                 ),
-              ),
-            if (!admin)
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ClubHeadScreen(review: true),
-                  ),
-                ),
-                icon: const Icon(Icons.badge_outlined),
-                label: const Text('Review Club Head Requests'),
-              ),
-            if (!admin) ...[
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                key: const ValueKey('open-pending-review'),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ReviewEventsScreen(),
-                  ),
-                ),
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('Review pending events'),
-              ),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ClubRequestsScreen(review: true),
-                  ),
-                ),
-                child: const Text('Review Club Requests'),
-              ),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ClubLifecycleScreen(),
-                  ),
-                ),
-                child: const Text('Manage Club Lifecycle'),
               ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+              CampusFeedback(_error!, icon: Icons.error_outline),
             ],
             const SizedBox(height: 18),
             OutlinedButton.icon(
@@ -265,4 +237,22 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
       ),
     );
   }
+}
+
+class _PortalAction extends StatelessWidget {
+  const _PortalAction(this.label, this.icon, this.destination, {super.key});
+
+  final String label;
+  final IconData icon;
+  final WidgetBuilder destination;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: CampusIconTile(icon),
+    title: Text(label),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: () =>
+        Navigator.of(context)
+            .push(MaterialPageRoute<void>(builder: destination)),
+  );
 }

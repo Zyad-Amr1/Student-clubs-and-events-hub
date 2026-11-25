@@ -1,6 +1,6 @@
 import 'package:campusconnect/app/app.dart';
-import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/app/design.dart';
+import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -75,11 +75,13 @@ class _AuthScreenState extends State<AuthScreen> {
       title: Text(_register ? 'Create student account' : 'Sign in'),
     ),
     body: SafeArea(
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Form(
               key: _formKey,
               child: Column(
@@ -90,6 +92,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     _register
                         ? 'Create an account with your university details.'
                         : 'Sign in with your campus account.',
+                    branded: true,
                   ),
                   const SizedBox(height: 20),
                   if (_register) ...[
@@ -97,7 +100,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       key: const ValueKey('register-name'),
                       controller: _name,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(labelText: 'Full name'),
+                      decoration: const InputDecoration(
+                        labelText: 'Full name',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                      ),
                       validator: (value) {
                         final required = _required(value);
                         if (required != null) return required;
@@ -115,6 +121,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     autofillHints: const [AutofillHints.email],
                     decoration: const InputDecoration(
                       labelText: 'University email',
+                      prefixIcon: Icon(Icons.mail_outline_rounded),
                     ),
                     validator: (value) {
                       final required = _required(value);
@@ -131,6 +138,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       controller: _universityId,
                       decoration: const InputDecoration(
                         labelText: 'University ID',
+                        prefixIcon: Icon(Icons.badge_outlined),
                       ),
                       validator: _required,
                     ),
@@ -140,8 +148,15 @@ class _AuthScreenState extends State<AuthScreen> {
                     key: const ValueKey('auth-password'),
                     controller: _password,
                     obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    autofillHints: _register
+                        ? const [AutofillHints.newPassword]
+                        : const [AutofillHints.password],
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock_outline_rounded),
+                    ),
                     validator: (value) {
                       final required = _required(value);
                       if (required != null) return required;
@@ -157,8 +172,11 @@ class _AuthScreenState extends State<AuthScreen> {
                       key: const ValueKey('register-confirm-password'),
                       controller: _confirmation,
                       obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       decoration: const InputDecoration(
                         labelText: 'Confirm password',
+                        prefixIcon: Icon(Icons.lock_outline_rounded),
                       ),
                       validator: (value) {
                         if (value != _password.text) {
@@ -170,12 +188,10 @@ class _AuthScreenState extends State<AuthScreen> {
                   ],
                   if (_error != null) ...[
                     const SizedBox(height: 16),
-                    Text(
+                    CampusFeedback(
                       _error!,
                       key: const ValueKey('auth-error'),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      icon: Icons.error_outline,
                     ),
                   ],
                   const SizedBox(height: 24),

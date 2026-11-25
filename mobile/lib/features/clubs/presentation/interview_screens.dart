@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -104,13 +105,13 @@ class _InterviewPageState extends State<_InterviewPage> {
               const Text('Sign in again to view interviews.')
             else ...[
               if (_busy) const LinearProgressIndicator(),
-              if (_error != null) ...[
-                Text(_error!),
-                TextButton(
-                  onPressed: _busy ? null : () => _run(),
-                  child: const Text('Refresh and retry'),
+              if (_error != null)
+                CampusFeedback(
+                  _error!,
+                  icon: Icons.error_outline,
+                  retry: _busy ? null : () => _run(),
+                  retryLabel: 'Refresh and retry',
                 ),
-              ],
               if (_data case final data?)
                 ...widget.children(
                   context,

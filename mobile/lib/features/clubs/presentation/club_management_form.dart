@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
@@ -100,17 +101,22 @@ class _ClubManagementFormState extends State<ClubManagementForm> {
           key: _form,
           child: ListView(
             padding: const EdgeInsets.all(20),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             children: [
+              const CampusSectionHeader(title: 'Club information'),
               if (editingClub)
                 Text('Club name · ${widget.club!.name}')
               else
                 _field(_name, 'Club name', 120),
               _field(_description, 'Description', 3000, lines: 5),
               _field(_category, 'Category', 80),
+              const CampusSectionHeader(title: 'Club logo'),
               Center(
                 child: UploadedImage(
                   _logoChanged
-                      ? null
+                      ? (_image == null
+                            ? null
+                            : 'data:image/jpeg;base64,$_image')
                       : widget.club?.logoUrl ?? widget.request?.logoUrl,
                 ),
               ),
@@ -133,7 +139,8 @@ class _ClubManagementFormState extends State<ClubManagementForm> {
                   ),
                 ],
               ),
-              if (_error != null) Text(_error!),
+              if (_error != null)
+                CampusFeedback(_error!, icon: Icons.error_outline),
               if (_busy) const LinearProgressIndicator(),
               FilledButton(
                 onPressed: _busy ? null : _save,

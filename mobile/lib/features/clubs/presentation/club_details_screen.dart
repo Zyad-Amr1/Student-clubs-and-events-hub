@@ -1,5 +1,6 @@
 import 'package:campusconnect/features/clubs/presentation/club_head_screen.dart';
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
@@ -114,20 +115,16 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null && _details == null
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (club.logoUrl?.startsWith('data:image/jpeg;base64,') ??
-                        false)
-                      Center(child: UploadedImage(club.logoUrl)),
-                    Text(_error!),
-                    TextButton(
-                      onPressed: () => _load(reset: true),
-                      child: const Text('Retry details'),
-                    ),
-                  ],
-                ),
+            ? ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  CampusFeedback(
+                    _error!,
+                    icon: Icons.error_outline,
+                    retry: () => _load(reset: true),
+                    retryLabel: 'Retry details',
+                  ),
+                ],
               )
             : RefreshIndicator(
                 onRefresh: () => _load(reset: true),
@@ -136,17 +133,29 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   children: [
-                    Text(
+                    CampusHeader(
                       club.name,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       club.category,
-                      style: Theme.of(context).textTheme.labelLarge,
+                      icon: Icons.groups_outlined,
+                      trailing:
+                          (club.logoUrl?.startsWith(
+                                'data:image/jpeg;base64,',
+                              ) ??
+                              false)
+                          ? UploadedImage(club.logoUrl, size: 48)
+                          : null,
                     ),
                     const SizedBox(height: 12),
-                    Text(club.description),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          club.description,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     FilledButton(
                       onPressed: _applying || _hasApplication ? null : _apply,
                       child: Text(
@@ -164,19 +173,21 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                       icon: const Icon(Icons.badge_outlined),
                       label: const Text('Club Head vacancy'),
                     ),
-                    const SizedBox(height: 26),
-                    Text(
-                      'Upcoming approved events',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
                     const SizedBox(height: 12),
+                    const CampusSectionHeader(
+                      title: 'Upcoming approved events',
+                    ),
                     if (_events.isEmpty)
-                      const Text('No upcoming published events for this club.'),
+                      const CampusFeedback(
+                        'No upcoming published events for this club.',
+                        icon: Icons.event_busy_outlined,
+                      ),
                     for (final event in _events)
                       Card(
                         key: ValueKey('event-${event.id}'),
                         child: ListTile(
                           title: Text(event.title),
+                          leading: const CampusIconTile(Icons.event_outlined),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(

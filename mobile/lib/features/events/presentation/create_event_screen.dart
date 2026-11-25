@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -128,124 +129,129 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('Manage events · ${widget.club.name}')),
       body: SafeArea(
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          children: [
-            if (current == null) ...[
-              Text(
-                'Create a draft for ${widget.club.name}',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Drafts are unpublished until Student Affairs approval.',
-              ),
-              const SizedBox(height: 18),
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      key: const ValueKey('draft-title'),
-                      controller: _title,
-                      validator: _required,
-                      maxLength: 160,
-                      decoration: const InputDecoration(
-                        labelText: 'Event title',
-                      ),
-                    ),
-                    TextFormField(
-                      key: const ValueKey('draft-description'),
-                      controller: _description,
-                      validator: _required,
-                      maxLength: 10000,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                      ),
-                    ),
-                    TextFormField(
-                      key: const ValueKey('draft-venue'),
-                      controller: _venue,
-                      validator: _required,
-                      maxLength: 200,
-                      decoration: const InputDecoration(labelText: 'Venue'),
-                    ),
-                    TextFormField(
-                      key: const ValueKey('draft-capacity'),
-                      controller: _capacity,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Seat capacity',
-                      ),
-                    ),
-                  ],
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (current == null) ...[
+                CampusHeader(
+                  'Create a draft for ${widget.club.name}',
+                  'Drafts are unpublished until Student Affairs approval.',
+                  icon: Icons.edit_calendar_outlined,
                 ),
-              ),
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                key: const ValueKey('pick-start-date'),
-                onPressed: _busy ? null : _chooseStart,
-                icon: const Icon(Icons.event_outlined),
-                label: Text(
-                  _startsAt == null
-                      ? 'Select start date and time'
-                      : 'Starts: ${_startsAt!.toLocal()}',
+                const SizedBox(height: 18),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        key: const ValueKey('draft-title'),
+                        controller: _title,
+                        validator: _required,
+                        maxLength: 160,
+                        decoration: const InputDecoration(
+                          labelText: 'Event title',
+                        ),
+                      ),
+                      TextFormField(
+                        key: const ValueKey('draft-description'),
+                        controller: _description,
+                        validator: _required,
+                        maxLength: 10000,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                        ),
+                      ),
+                      TextFormField(
+                        key: const ValueKey('draft-venue'),
+                        controller: _venue,
+                        validator: _required,
+                        maxLength: 200,
+                        decoration: const InputDecoration(labelText: 'Venue'),
+                      ),
+                      TextFormField(
+                        key: const ValueKey('draft-capacity'),
+                        controller: _capacity,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Seat capacity',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                key: const ValueKey('create-draft'),
-                onPressed: _busy ? null : _create,
-                icon: const Icon(Icons.edit_note_outlined),
-                label: const Text('Create draft'),
-              ),
-            ] else ...[
-              Text(
-                current.title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Status: ${current.approvalStatus}',
-                key: const ValueKey('draft-status'),
-              ),
-              Text('Published: ${current.isPublished ? 'Yes' : 'No'}'),
-              Text('Venue: ${current.venue}'),
-              Text('Starts: ${current.startsAt.toLocal()}'),
-              const SizedBox(height: 20),
-              if (current.approvalStatus == 'draft')
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  key: const ValueKey('pick-start-date'),
+                  onPressed: _busy ? null : _chooseStart,
+                  icon: const Icon(Icons.event_outlined),
+                  label: Text(
+                    _startsAt == null
+                        ? 'Select start date and time'
+                        : 'Starts: ${_startsAt!.toLocal()}',
+                  ),
+                ),
+                const SizedBox(height: 18),
                 FilledButton.icon(
-                  key: const ValueKey('submit-draft'),
-                  onPressed: _busy ? null : _submit,
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('Submit for Student Affairs review'),
+                  key: const ValueKey('create-draft'),
+                  onPressed: _busy ? null : _create,
+                  icon: const Icon(Icons.edit_note_outlined),
+                  label: const Text('Create draft'),
                 ),
-              if (current.approvalStatus == 'pending')
-                const Text('Submitted. Awaiting Student Affairs approval.'),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                key: const ValueKey('new-draft'),
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                        _draft = null;
-                        _startsAt = null;
-                        _formKey.currentState?.reset();
-                      }),
-                child: const Text('Create another draft'),
-              ),
+              ] else ...[
+                CampusHeader(
+                  current.title,
+                  current.venue,
+                  icon: Icons.event_outlined,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Status: ${current.approvalStatus}',
+                  key: const ValueKey('draft-status'),
+                ),
+                Text('Published: ${current.isPublished ? 'Yes' : 'No'}'),
+                Text('Venue: ${current.venue}'),
+                Text('Starts: ${current.startsAt.toLocal()}'),
+                const SizedBox(height: 20),
+                if (current.approvalStatus == 'draft')
+                  FilledButton.icon(
+                    key: const ValueKey('submit-draft'),
+                    onPressed: _busy ? null : _submit,
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Submit for Student Affairs review'),
+                  ),
+                if (current.approvalStatus == 'pending')
+                  const CampusFeedback(
+                    'Submitted. Awaiting Student Affairs approval.',
+                    icon: Icons.check_circle_outline,
+                  ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  key: const ValueKey('new-draft'),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                          _draft = null;
+                          _startsAt = null;
+                          _formKey.currentState?.reset();
+                        }),
+                  child: const Text('Create another draft'),
+                ),
+              ],
+              if (_busy) const Center(child: CircularProgressIndicator()),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                CampusFeedback(
+                  _error!,
+                  key: const ValueKey('event-error'),
+                  icon: Icons.error_outline,
+                ),
+              ],
             ],
-            if (_busy) const Center(child: CircularProgressIndicator()),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                key: const ValueKey('event-error'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

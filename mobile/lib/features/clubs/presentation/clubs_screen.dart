@@ -169,13 +169,16 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 child: Divider(height: 1, color: CampusColors.line),
               ),
             ),
+            if (MediaQuery.viewInsetsOf(context).bottom == 0)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: _DiscoveryBanner(onExplore: _searchFocus.requestFocus),
+                ),
+              ),
           ],
           body: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: _DiscoveryBanner(onExplore: _searchFocus.requestFocus),
-              ),
               // Search + Filter bar
               Container(
                 color: CampusColors.canvas,
@@ -214,33 +217,31 @@ class _ClubsScreenState extends State<ClubsScreen> {
                         ),
                         const SizedBox(width: 10),
                         // Filter icon
-                        Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          child: InkWell(
-                            onTap: () => _showFilterSheet(context),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: CampusColors.line),
-                              ),
-                              child: Icon(
-                                Icons.tune_rounded,
-                                color: _categoryController.text.isNotEmpty
-                                    ? CampusColors.purple
-                                    : Colors.grey.shade600,
-                              ),
+                        IconButton.outlined(
+                          tooltip: 'Filter by category',
+                          onPressed: () => _showFilterSheet(context),
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size.square(48),
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(color: CampusColors.line),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
+                          ),
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            color: _categoryController.text.isNotEmpty
+                                ? CampusColors.purple
+                                : CampusColors.inkMuted,
                           ),
                         ),
                       ],
                     ),
                     // Keep exact category entry available for server-side filtering.
-                    const SizedBox(height: 10),
-                    _buildCategoryChips(),
+                    if (MediaQuery.viewInsetsOf(context).bottom == 0) ...[
+                      const SizedBox(height: 6),
+                      _buildCategoryChips(),
+                    ],
                     TextField(
                       key: const ValueKey('club-category-filter'),
                       controller: _categoryController,
@@ -319,7 +320,6 @@ class _ClubsScreenState extends State<ClubsScreen> {
                           key: const ValueKey('club-list'),
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          itemExtent: 108,
                           itemCount: _clubs.length + (_error != null ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == _clubs.length) {
@@ -375,7 +375,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
       ('Sports', 'Sports', Icons.sports_basketball_outlined),
     ];
     return SizedBox(
-      height: 36,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
@@ -383,22 +383,16 @@ class _ClubsScreenState extends State<ClubsScreen> {
         itemBuilder: (context, i) {
           final (label, value, icon) = categories[i];
           final selected = _categoryController.text == value;
-          return GestureDetector(
-            onTap: () {
-              _categoryController.text = value;
-              _criteriaChanged();
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: selected ? CampusColors.purple : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected ? CampusColors.purple : CampusColors.line,
-                ),
-              ),
-              child: Row(
+          return Center(
+            child: ChoiceChip(
+              selected: selected,
+              onSelected: (_) {
+                _categoryController.text = value;
+                _criteriaChanged();
+              },
+              showCheckmark: false,
+              selectedColor: CampusColors.purple,
+              label: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
@@ -427,11 +421,18 @@ class _ClubsScreenState extends State<ClubsScreen> {
   void _showFilterSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
+      builder: (context) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -567,7 +568,6 @@ class _DiscoveryBanner extends StatelessWidget {
       onTap: onExplore,
       borderRadius: BorderRadius.circular(22),
       child: Ink(
-        height: 112,
         decoration: BoxDecoration(
           gradient: CampusColors.cardGradient,
           borderRadius: BorderRadius.circular(22),
@@ -584,7 +584,7 @@ class _DiscoveryBanner extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 108, 12),
+              padding: const EdgeInsets.fromLTRB(16, 18, 54, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -601,8 +601,6 @@ class _DiscoveryBanner extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     'Discover student clubs and meet like-minded peers.',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.88),
                       fontSize: 11,

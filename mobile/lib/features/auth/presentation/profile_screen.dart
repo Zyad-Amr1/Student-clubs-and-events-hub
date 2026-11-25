@@ -130,55 +130,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
           children: [
             Card(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 94,
-                      height: 94,
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: CampusColors.gradient,
-                      ),
-                      child: ClipOval(
-                        child: ColoredBox(
-                          color: CampusColors.lavender,
-                          child: UploadedImage(user.picture, size: 88),
+              clipBehavior: Clip.antiAlias,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: CampusColors.softGradient,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 94,
+                        height: 94,
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: CampusColors.gradient,
+                        ),
+                        child: ClipOval(
+                          child: ColoredBox(
+                            color: CampusColors.lavender,
+                            child: UploadedImage(user.picture, size: 88),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      user.fullName,
-                      key: const ValueKey('profile-name'),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    if (campusDetails.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
                       Text(
-                        campusDetails,
+                        user.fullName,
+                        key: const ValueKey('profile-name'),
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ],
-                    const SizedBox(height: 10),
-                    CampusStatus(
-                      user.accountType == 'student'
-                          ? (_hasClub ? 'Student · Club Admin' : 'Student')
-                          : user.accountType,
-                    ),
-                    if (_hasClub) ...[
+                      if (campusDetails.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          campusDetails,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                       const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: _switching ? null : _manage,
-                        icon: const Icon(Icons.admin_panel_settings_outlined),
-                        label: const Text('Manage My Club'),
+                      CampusStatus(
+                        user.accountType == 'student'
+                            ? (_hasClub ? 'Student · Club Admin' : 'Student')
+                            : user.accountType,
                       ),
+                      if (_hasClub) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: _switching ? null : _manage,
+                          icon: const Icon(Icons.admin_panel_settings_outlined),
+                          label: const Text('Manage My Club'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -198,6 +204,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
                     ListTile(
                       leading: const Icon(Icons.inbox_outlined),
                       title: const Text('My Club Requests'),
@@ -222,6 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
                     ListTile(
                       leading: const Icon(Icons.assignment_outlined),
                       title: const Text('My Applications'),

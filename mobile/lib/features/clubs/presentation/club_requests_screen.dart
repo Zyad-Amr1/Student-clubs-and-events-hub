@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/club_management_form.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
@@ -133,17 +134,18 @@ class _ClubRequestsScreenState extends State<ClubRequestsScreen> {
                   child: const Text('Request a New Club'),
                 ),
               if (_busy) const LinearProgressIndicator(),
-              if (_error != null) ...[
-                Text(_error!),
-                TextButton(
-                  onPressed: _busy ? null : () => _load(reset: true),
-                  child: const Text('Retry'),
-                ),
-              ] else if (!_busy && _requests.isEmpty)
-                Text(
+              if (_error != null)
+                CampusFeedback(
+                  _error!,
+                  icon: Icons.error_outline,
+                  retry: _busy ? null : () => _load(reset: true),
+                )
+              else if (!_busy && _requests.isEmpty)
+                CampusFeedback(
                   widget.review
                       ? 'No pending club requests.'
                       : 'You have no club requests yet.',
+                  icon: Icons.inbox_outlined,
                 ),
               for (final request in _requests)
                 Card(

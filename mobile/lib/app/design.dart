@@ -28,6 +28,12 @@ abstract final class CampusColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static const softGradient = LinearGradient(
+    colors: [lavenderActive, canvas, Colors.white],
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+  );
 }
 
 class CampusBrandLockup extends StatelessWidget {
@@ -73,23 +79,25 @@ class CampusBrandLockup extends StatelessWidget {
           child: Icon(icon, size: logoSize * 0.63, color: Colors.white),
         ),
         const SizedBox(width: 10),
-        RichText(
-          text: TextSpan(
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -fontSize * 0.045,
-              color: inverse ? Colors.white : CampusColors.ink,
-            ),
-            children: [
-              const TextSpan(text: 'Campus'),
-              TextSpan(
-                text: 'Connect',
-                style: TextStyle(
-                  color: inverse ? Colors.white : CampusColors.purple,
-                ),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -fontSize * 0.045,
+                color: inverse ? Colors.white : CampusColors.ink,
               ),
-            ],
+              children: [
+                const TextSpan(text: 'Campus'),
+                TextSpan(
+                  text: 'Connect',
+                  style: TextStyle(
+                    color: inverse ? Colors.white : CampusColors.purple,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -219,6 +227,7 @@ class CampusHeader extends StatelessWidget {
     this.subtitle, {
     this.icon = Icons.school_outlined,
     this.trailing,
+    this.branded = false,
     super.key,
   });
 
@@ -226,49 +235,78 @@ class CampusHeader extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Widget? trailing;
+  final bool branded;
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(24),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       gradient: CampusColors.gradient,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            CampusBrandLockup(
-              inverse: true,
-              icon: icon,
-              logoSize: 36,
-              fontSize: 18,
-            ),
-            const Spacer(),
-            ?trailing,
+            if (branded)
+              Flexible(
+                child: CampusBrandLockup(
+                  inverse: true,
+                  icon: icon,
+                  logoSize: 36,
+                  fontSize: 18,
+                ),
+              )
+            else
+              CampusIconTile(icon, inverse: true),
+            if (trailing != null) ...[const Spacer(), trailing!],
           ],
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 14),
         Text(
           title,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: Color(0xFFF0DFFA),
-            height: 1.45,
-            fontSize: 15,
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFFF4E9FC),
+              height: 1.45,
+              fontSize: 14,
+            ),
           ),
-        ),
+        ],
       ],
+    ),
+  );
+}
+
+class CampusIconTile extends StatelessWidget {
+  const CampusIconTile(this.icon, {this.inverse = false, super.key});
+
+  final IconData icon;
+  final bool inverse;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 38,
+    height: 38,
+    decoration: BoxDecoration(
+      color: inverse ? const Color(0x29FFFFFF) : CampusColors.lavender,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Icon(
+      icon,
+      size: 20,
+      color: inverse ? Colors.white : CampusColors.purple,
     ),
   );
 }
@@ -370,22 +408,22 @@ class CampusSectionHeader extends StatelessWidget {
           Icon(icon, color: CampusColors.purple, size: 22),
           const SizedBox(width: 8),
         ],
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            color: CampusColors.ink,
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: CampusColors.ink,
+            ),
           ),
         ),
-        const Spacer(),
         if (actionLabel != null && onAction != null)
           TextButton(
             onPressed: onAction,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(48, 44),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -419,7 +457,7 @@ class CampusStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (background, foreground, icon) = switch (label) {
-      'Open' || 'Approved' || 'Confirmed' || 'Active' => (
+      'Open' || 'Approved' || 'Confirmed' || 'Active' || 'Accepted' => (
         CampusColors.greenBg,
         CampusColors.greenFg,
         Icons.check_circle_outline,
@@ -439,6 +477,11 @@ class CampusStatus extends StatelessWidget {
         const Color(0xFF554466),
         Icons.archive_outlined,
       ),
+      _ when label.startsWith('Waitlisted') => (
+        CampusColors.amberBg,
+        CampusColors.amberFg,
+        Icons.hourglass_top_outlined,
+      ),
       _ => (const Color(0xFFEFDEFA), const Color(0xFF54158E), null),
     };
     return Container(
@@ -454,12 +497,14 @@ class CampusStatus extends StatelessWidget {
             Icon(icon, size: 13, color: foreground),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -473,25 +518,79 @@ class CampusFeedback extends StatelessWidget {
     this.message, {
     this.icon = Icons.info_outline,
     this.retry,
+    this.retryLabel = 'Retry',
     super.key,
   });
   final String message;
   final IconData icon;
   final VoidCallback? retry;
+  final String retryLabel;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Icon(icon, color: CampusColors.purple),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
-          if (retry != null)
-            TextButton(onPressed: retry, child: const Text('Retry')),
-        ],
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    child: Card(
+      color: icon == Icons.error_outline
+          ? CampusColors.redBg
+          : CampusColors.lavender,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  icon,
+                  color: icon == Icons.error_outline
+                      ? CampusColors.redFg
+                      : CampusColors.purple,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+              ],
+            ),
+            if (retry != null)
+              TextButton(onPressed: retry, child: Text(retryLabel)),
+          ],
+        ),
       ),
+    ),
+  );
+}
+
+class CampusDetailRow extends StatelessWidget {
+  const CampusDetailRow(this.icon, this.label, this.value, {super.key});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CampusIconTile(icon),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+              Text(value),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }

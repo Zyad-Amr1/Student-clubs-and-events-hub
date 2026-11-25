@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/features/clubs/presentation/interview_screens.dart';
 import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
@@ -95,23 +96,30 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (_error case final error?) ...[
-                      Text(error),
-                      TextButton(onPressed: _load, child: const Text('Retry')),
-                    ] else if (groups.isEmpty)
-                      const Text('You have no event reservations yet.'),
+                    const CampusHeader(
+                      'Event reservations',
+                      'View your bookings and waitlist status by date.',
+                      icon: Icons.calendar_month_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    if (_error case final error?)
+                      CampusFeedback(
+                        error,
+                        icon: Icons.error_outline,
+                        retry: _load,
+                      )
+                    else if (groups.isEmpty)
+                      const CampusFeedback(
+                        'You have no event reservations yet.',
+                        icon: Icons.event_busy_outlined,
+                      ),
                     for (final MapEntry(key: day, value: reservations)
                         in groups.entries) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          formats.formatFullDate(day),
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
+                      CampusSectionHeader(title: formats.formatFullDate(day)),
                       for (final reservation in reservations)
                         Card(
                           child: ListTile(
+                            leading: const CampusIconTile(Icons.event_outlined),
                             title: Text(reservation.event.title),
                             subtitle: Text(
                               '${formats.formatTimeOfDay(TimeOfDay.fromDateTime(reservation.event.startsAt.toLocal()))}'

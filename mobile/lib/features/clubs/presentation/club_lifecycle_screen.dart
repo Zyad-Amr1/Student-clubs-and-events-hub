@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -264,43 +265,56 @@ class _ClubLifecycleScreenState extends State<ClubLifecycleScreen> {
             ? const Center(child: CircularProgressIndicator())
             : _error != null
             ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 children: [
-                  const SizedBox(height: 80),
-                  Center(child: Text(_error!)),
-                  Center(
-                    child: TextButton(
-                      onPressed: _load,
-                      child: const Text('Retry'),
-                    ),
+                  CampusFeedback(
+                    _error!,
+                    icon: Icons.error_outline,
+                    retry: _load,
                   ),
                 ],
               )
             : widget.studentNotices
             ? _notices.isEmpty
                   ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
                       children: const [
-                        SizedBox(height: 100),
-                        Center(child: Text('No club notifications yet.')),
+                        CampusFeedback(
+                          'No club notifications yet.',
+                          icon: Icons.notifications_none_rounded,
+                        ),
                       ],
                     )
                   : ListView(
+                      padding: const EdgeInsets.all(16),
                       children: [
                         for (final notice in _notices)
-                          ListTile(
-                            leading: const Icon(Icons.notifications_outlined),
-                            title: Text(notice['club_name'] as String),
-                            subtitle: Text(notice['message'] as String),
+                          Card(
+                            child: ListTile(
+                              leading: const CampusIconTile(
+                                Icons.notifications_outlined,
+                              ),
+                              title: Text(notice['club_name'] as String),
+                              subtitle: Text(notice['message'] as String),
+                            ),
                           ),
                       ],
                     )
             : _clubs.isEmpty
             ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 children: const [
-                  SizedBox(height: 100),
-                  Center(child: Text('No approved clubs.')),
+                  CampusFeedback(
+                    'No approved clubs.',
+                    icon: Icons.groups_outlined,
+                  ),
                 ],
               )
             : ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
                   for (final club in _clubs)
                     Card(

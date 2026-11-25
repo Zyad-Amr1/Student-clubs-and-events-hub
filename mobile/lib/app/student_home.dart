@@ -209,7 +209,6 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
           padding: EdgeInsets.zero,
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            // Purple Top Header matching screenshot
             _buildHeader(context, firstName),
 
             Padding(
@@ -267,7 +266,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                   CampusSectionHeader(
                     title: 'Explore Clubs',
                     icon: Icons.groups_outlined,
-                    actionLabel: 'View All >',
+                    actionLabel: 'View all',
                     onAction: widget.onOpenClubs,
                   ),
                   const SizedBox(height: 8),
@@ -308,8 +307,9 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
         children: [
           Row(
             children: [
-              const CampusBrandLockup(logoSize: 34, fontSize: 18),
-              const Spacer(),
+              const Expanded(
+                child: CampusBrandLockup(logoSize: 34, fontSize: 18),
+              ),
               IconButton(
                 tooltip: 'Notifications',
                 onPressed: () => Navigator.of(context).push(
@@ -381,155 +381,59 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
   }
 
   Widget _buildFeaturedCard(BuildContext context, CampusEvent event) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: CampusColors.cardGradient,
-        image: const DecorationImage(
-          image: AssetImage('assets/images/campus-hero.png'),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(Color(0xAA3B126F), BlendMode.srcOver),
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33280747),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.star, color: Color(0xFFFFD54F), size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      'Featured Event',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+    final theme = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openEvent(event),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Image(
+              image: AssetImage('assets/images/campus-hero.png'),
+              height: 112,
+              fit: BoxFit.cover,
+              alignment: Alignment(0, 0.35),
+              excludeFromSemantics: true,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: CampusColors.lavender,
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                    child: Text(
+                      _formatMonthDay(event.startsAt),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: CampusColors.purpleDark,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      event.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 13,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${_formatWeekday(event.startsAt)}, ${_formatMonthDay(event.startsAt)}',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 14,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            event.venue,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
+                        Text(event.title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 2),
+                        Text('${event.venue} · ${_formatTime(event.startsAt)}'),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => _openEvent(event),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: CampusColors.purpleDark,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'View Details',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_rounded, size: 15),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: CampusColors.purple,
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -116,27 +117,29 @@ class _ReviewEventsScreenState extends State<ReviewEventsScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text(
+                CampusHeader(
                   'Awaiting review: $_total',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  'Review submissions before they appear on the student calendar.',
+                  icon: Icons.fact_check_outlined,
                 ),
                 const SizedBox(height: 12),
                 if (_lastAction != null)
-                  Text(_lastAction!, key: const ValueKey('review-result')),
-                if (_error != null) ...[
-                  Text(
+                  CampusFeedback(
+                    _lastAction!,
+                    key: const ValueKey('review-result'),
+                  ),
+                if (_error != null)
+                  CampusFeedback(
                     _error!,
                     key: const ValueKey('review-error'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    icon: Icons.error_outline,
+                    retry: () => _load(reset: true),
                   ),
-                  TextButton(
-                    onPressed: () => _load(reset: true),
-                    child: const Text('Retry'),
+                if (_events.isEmpty && _error == null)
+                  const CampusFeedback(
+                    'No pending events to review.',
+                    icon: Icons.inbox_outlined,
                   ),
-                ],
-                if (_events.isEmpty) const Text('No pending events to review.'),
                 for (final event in _events)
                   Card(
                     key: ValueKey('pending-event-${event.id}'),
