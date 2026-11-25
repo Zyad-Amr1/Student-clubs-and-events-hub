@@ -119,6 +119,14 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('load-more-clubs')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('club-${clubs.last.id}')),
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('club-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.byKey(ValueKey('club-${clubs.last.id}')), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('club-category-filter')),

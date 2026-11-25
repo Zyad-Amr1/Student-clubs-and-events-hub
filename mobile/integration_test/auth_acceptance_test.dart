@@ -73,6 +73,18 @@ void main() {
         ),
       );
 
+      await expectLater(
+        api.register(
+          fullName: 'Duplicate Identifier',
+          email: 'other-$suffix@example.edu',
+          universityId: universityId,
+          password: password,
+          confirmPassword: password,
+        ),
+        throwsA(
+          isA<ApiFailure>().having((e) => e.statusCode, 'statusCode', 409),
+        ),
+      );
       // Rebuilds the app in the same Android process and restores its saved token.
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(CampusConnectApp(api: api));
@@ -103,6 +115,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('auth-error')), findsOneWidget);
       expect(await store.read(), isNull);
+      await tester.enterText(find.byKey(const ValueKey('auth-email')), email);
+      await tester.enterText(
+        find.byKey(const ValueKey('auth-password')),
+        password,
+      );
+      await tester.tap(find.byKey(const ValueKey('auth-submit')));
+      await tester.pumpAndSettle();
+      expect(find.byType(StudentHome), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('open-profile')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('profile-logout')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('open-auth')));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('auth-email')),
         affairsEmail,
