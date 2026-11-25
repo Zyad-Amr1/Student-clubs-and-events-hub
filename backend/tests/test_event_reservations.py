@@ -134,6 +134,45 @@ def test_student_reserves_published_event_and_duplicate_is_rejected(
             )
 
 
+def test_previously_republished_cancelled_event_cannot_accept_reservations_or_promote(
+    draft_client, draft_test_engine, scenario, published_event, synthetic_test_password_hash,
+):
+    event_id = published_event["id"]
+    ids, headers = scenario["ids"], scenario["headers"]
+    assert post_reservation(draft_client, event_id, headers["student"]).json()["status"] == "confirmed"
+    assert post_reservation(draft_client, event_id, headers["owner"]).json()["status"] == "waitlisted"
+
+    # Model a cancelled event republished before this fix, with live reservations.
+    with draft_test_engine.begin() as db:
+        db.execute(text("UPDATE events SET cancelled_at=now(), cancellation_reason='Building closed' "
+                        "WHERE id=:id"), {"id": event_id})
+    _, newcomer = add_student(
+        draft_client, draft_test_engine, synthetic_test_password_hash, "after-cancellation",
+    )
+
+    assert post_reservation(draft_client, event_id, newcomer).status_code == 404
+    assert cancel_reservation(draft_client, event_id, headers["student"]).status_code == 409
+    assert reservations_for(draft_test_engine, event_id) == [
+        (ids["student"], "confirmed"), (ids["owner"], "waitlisted"),
+    ]
+    history = draft_client.get("/api/v1/me/reservations", headers=headers["owner"]).json()["reservations"]
+    assert history[0]["status"] == "cancelled" and history[0]["waitlist_position"] is None
+    assert history[0]["event"]["cancellation_reason"] == "Building closed"
+
+    lifecycle = f"/api/v1/student-affairs/clubs/{ids['club']}"
+    preview = draft_client.post(lifecycle + "/archive-preview", headers=headers["affairs"])
+    assert preview.status_code == 200, preview.text
+    archived = draft_client.post(lifecycle + "/archive", headers=headers["affairs"], json={
+        "reason": "Closing again", "preview_token": preview.json()["preview_token"],
+    })
+    assert archived.status_code == 200, archived.text
+    assert reservations_for(draft_test_engine, event_id) == [
+        (ids["student"], "cancelled"), (ids["owner"], "cancelled"),
+    ]
+    assert draft_client.get("/api/v1/me/reservations",
+                            headers=headers["owner"]).json()["reservations"] == history
+
+
 def test_capacity_is_enforced_for_concurrent_students(
     draft_test_engine, scenario, published_event
 ):

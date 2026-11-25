@@ -158,6 +158,8 @@ def submit_draft_event(
     if event is None:
         raise HTTPException(status_code=404, detail="Club or event not found")
 
+    if event.cancelled_at is not None:
+        raise HTTPException(status_code=409, detail="Event was cancelled")
     if event.approval_status != EventApprovalStatus.DRAFT or event.is_published:
         raise HTTPException(status_code=409, detail="Event is not an unpublished draft")
 

@@ -55,7 +55,8 @@ def _event_and_club(db: Session, event_id: UUID, *, lock_event: bool):
 
 def _is_reservable(event: Event, club: Club) -> bool:
     return (
-        event.approval_status == EventApprovalStatus.APPROVED
+        event.cancelled_at is None
+        and event.approval_status == EventApprovalStatus.APPROVED
         and event.is_published
         and event.starts_at > datetime.now(timezone.utc)
         and club.is_active
@@ -82,12 +83,13 @@ def _waitlist_position(db: Session, reservation: EventReservation) -> int:
 def _reservation_response(
     db: Session, reservation: EventReservation, event: Event
 ) -> EventReservationResponse:
+    reservation_status = "cancelled" if event.cancelled_at is not None else reservation.status
     return EventReservationResponse(
         event_id=reservation.event_id,
-        status=reservation.status,
+        status=reservation_status,
         waitlist_position=(
             _waitlist_position(db, reservation)
-            if reservation.status == _WAITLISTED
+            if reservation_status == _WAITLISTED
             else None
         ),
         event=ReservedEventDetails.model_validate(event),
@@ -202,7 +204,7 @@ def cancel_event_reservation(
     )
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
-    if reservation.status == "cancelled":
+    if event.cancelled_at is not None or reservation.status == "cancelled":
         raise HTTPException(status_code=409, detail="This event reservation was cancelled")
 
     released_confirmed_seat = reservation.status == _CONFIRMED
