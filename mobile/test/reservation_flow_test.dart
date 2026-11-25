@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/app.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -118,6 +119,101 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('You have no event reservations yet.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'dashboard_reservation_failure_shows_unavailable_and_retry_recovers',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final event = {
+        'id': eventId,
+        'club_id': clubId,
+        'title': 'Recovered Robotics Workshop',
+        'description': 'Build a robot',
+        'venue': 'Engineering Hall',
+        'starts_at': '2099-11-26T10:00:00Z',
+        'ends_at': null,
+        'seat_capacity': 1,
+      };
+      var failReservations = true;
+      var reservationRequests = 0;
+      final transport = FakeApiTransport((call) {
+        expect(call.headers['Authorization'], 'Bearer student-test-token');
+        switch ((call.method, call.uri.path)) {
+          case ('GET', '/api/v1/auth/me'):
+            return ok(profileJson);
+          case ('GET', '/api/v1/clubs'):
+            return ok({
+              'clubs': [clubJson],
+              'page': 1,
+              'page_size': 20,
+              'total': 1,
+            });
+          case ('GET', '/api/v1/clubs/$clubId'):
+            return ok({'club': clubJson, 'events': [], 'total': 0});
+          case ('GET', '/api/v1/me/reservations'):
+            reservationRequests++;
+            if (failReservations) {
+              return ok({'detail': 'Reservations unavailable'}, 503);
+            }
+            return ok({
+              'reservations': [
+                {
+                  'event_id': eventId,
+                  'status': 'confirmed',
+                  'waitlist_position': null,
+                  'event': event,
+                },
+              ],
+            });
+          default:
+            fail('Unexpected request: ${call.method} ${call.uri.path}');
+        }
+      });
+      await tester.pumpWidget(
+        CampusConnectApp(
+          api: CampusApi(transport: transport),
+          tokenStore: MemoryTokenStore()..token = 'student-test-token',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home'));
+      await tester.pumpAndSettle();
+
+      String stat(String label) => tester
+          .widget<CampusStatCard>(
+            find.byWidgetPredicate(
+              (widget) => widget is CampusStatCard && widget.label == label,
+            ),
+          )
+          .value;
+
+      final error = find.text(
+        'Could not load your reservations. Please retry.',
+      );
+      expect(reservationRequests, 1);
+      expect(stat('Upcoming Events'), '—');
+      expect(stat('My Bookings'), '—');
+      expect(stat('Campus Clubs'), '1');
+      expect(error, findsOneWidget);
+      expect(find.text('No upcoming reservations'), findsNothing);
+      final retry = find.widgetWithText(TextButton, 'Retry');
+      expect(retry, findsOneWidget);
+
+      failReservations = false;
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+
+      expect(reservationRequests, 2);
+      expect(stat('Upcoming Events'), '1');
+      expect(stat('My Bookings'), '1');
+      expect(error, findsNothing);
+      expect(retry, findsNothing);
+      expect(find.text('Recovered Robotics Workshop'), findsWidgets);
+      expect(find.text('Confirmed'), findsWidgets);
     },
   );
 }
