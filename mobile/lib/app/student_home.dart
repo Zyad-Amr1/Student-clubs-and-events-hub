@@ -62,6 +62,7 @@ class _StudentDashboardView extends StatefulWidget {
 class _StudentDashboardViewState extends State<_StudentDashboardView> {
   bool _loading = true;
   String? _error;
+  String? _reservationError;
   List<CampusClub> _clubs = [];
   int _totalClubs = 0;
   List<EventReservation> _reservations = [];
@@ -90,6 +91,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
     setState(() {
       _loading = true;
       _error = null;
+      _reservationError = null;
     });
 
     try {
@@ -107,6 +109,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
           ..sort((a, b) => a.event.startsAt.compareTo(b.event.startsAt));
       } catch (_) {
         _reservations = [];
+        _reservationError = 'Could not load your reservations. Please retry.';
       }
 
       // Count only the student's upcoming reservations.
@@ -229,15 +232,18 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                     children: [
                       CampusStatCard(
                         icon: Icons.calendar_today_outlined,
-                        value: '$_upcomingEventsCount',
+                        value: _reservationError == null
+                            ? '$_upcomingEventsCount'
+                            : '—',
                         label: 'Upcoming Events',
                         onTap: widget.onOpenCalendar,
                       ),
                       const SizedBox(width: 10),
                       CampusStatCard(
                         icon: Icons.confirmation_num_outlined,
-                        value:
-                            '${_reservations.where((r) => r.status != ReservationStatus.cancelled).length}',
+                        value: _reservationError == null
+                            ? '${_reservations.where((r) => r.status != ReservationStatus.cancelled).length}'
+                            : '—',
                         label: 'My Bookings',
                         onTap: widget.onOpenCalendar,
                       ),
@@ -608,6 +614,24 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
   }
 
   Widget _buildUpcomingEventsList(BuildContext context) {
+    if (_reservationError case final error?) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, color: CampusColors.redFg),
+              const SizedBox(width: 12),
+              Expanded(child: Text(error)),
+              TextButton(
+                onPressed: _loading ? null : _load,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final upcoming = _upcomingReservations;
     if (upcoming.isEmpty) {
       return Card(
