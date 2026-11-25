@@ -184,6 +184,14 @@ def test_student_affairs_has_no_bypass_even_if_granted(
     draft_client, draft_test_engine, scenario, owned_draft
 ):
     ids = scenario["ids"]
+    # A club can have only one administrator once migration 0006 is applied.
+    # Replace the Student grant in test setup rather than creating a
+    # contradictory second grant; Student Affairs still cannot submit.
+    with draft_test_engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM club_administrators WHERE club_id=:id"),
+            {"id": ids["club"]},
+        )
     grant_admin(draft_test_engine, ids["club"], ids["affairs"])
     response = submit(
         draft_client, ids["club"], owned_draft["id"],
