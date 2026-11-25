@@ -4,6 +4,7 @@ import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/account_screens.dart';
 import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
+import 'package:campusconnect/features/clubs/presentation/membership_screen.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -165,15 +166,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (mounted) await _checkClubs();
                 },
               ),
-              const ListTile(
-                enabled: false,
-                title: Text('My Clubs'),
-                subtitle: Text('Membership features are not available yet'),
+              ListTile(
+                title: const Text('My Clubs'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MembershipScreen(memberships: true),
+                  ),
+                ),
               ),
-              const ListTile(
-                enabled: false,
-                title: Text('My Applications'),
-                subtitle: Text('Club applications are not available yet'),
+              ListTile(
+                title: const Text('My Applications'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MembershipScreen(),
+                  ),
+                ),
               ),
             ],
             const SizedBox(height: 30),

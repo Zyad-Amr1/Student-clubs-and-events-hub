@@ -21,7 +21,32 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
   int _total = 0;
   bool _loading = true;
   bool _loadingMore = false;
+  bool _applying = false;
+  bool _hasApplication = false;
   String? _error;
+
+  Future<void> _apply() async {
+    if (_applying) return;
+    final session = StudentSessionScope.of(context);
+    setState(() => _applying = true);
+    String message;
+    try {
+      await session.authenticated(
+        (token) => session.api.applyToClub(token, widget.club.id),
+      );
+      _hasApplication = true;
+      message = 'Application submitted. Track it in My Applications.';
+    } on ApiFailure catch (error) {
+      _hasApplication = error.statusCode == 409;
+      message = error.message;
+    } finally {
+      if (mounted) setState(() => _applying = false);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
 
   @override
   void initState() {
@@ -121,6 +146,14 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(club.description),
+                    FilledButton(
+                      onPressed: _applying || _hasApplication ? null : _apply,
+                      child: Text(
+                        _hasApplication
+                            ? 'Application on file'
+                            : 'Apply to join',
+                      ),
+                    ),
                     const SizedBox(height: 26),
                     Text(
                       'Upcoming approved events',

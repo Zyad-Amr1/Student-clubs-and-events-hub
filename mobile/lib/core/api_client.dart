@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+part 'membership_api.dart';
+
 typedef JsonObject = Map<String, dynamic>;
 
 class ApiFailure implements Exception {

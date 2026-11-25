@@ -5,6 +5,7 @@ import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/account_screens.dart';
 import 'package:campusconnect/features/clubs/presentation/club_management_form.dart';
 import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
+import 'package:campusconnect/features/clubs/presentation/membership_screen.dart';
 import 'package:campusconnect/features/events/presentation/create_event_screen.dart';
 import 'package:campusconnect/features/events/presentation/review_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -151,6 +152,14 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                           ),
                         ),
                         child: const Text('Edit Club Profile'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MembershipScreen(club: club),
+                          ),
+                        ),
+                        child: const Text('Membership Applications'),
                       ),
                     ],
                   ),
