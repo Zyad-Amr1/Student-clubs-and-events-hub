@@ -212,6 +212,56 @@ class ManagedClub {
       ManagedClub(id: json['id'] as String, name: json['name'] as String);
 }
 
+class ManagedEvent {
+  const ManagedEvent({
+    required this.id,
+    required this.clubId,
+    required this.title,
+    required this.description,
+    required this.venue,
+    required this.startsAt,
+    required this.seatCapacity,
+    required this.approvalStatus,
+    required this.isPublished,
+  });
+
+  final String id;
+  final String clubId;
+  final String title;
+  final String description;
+  final String venue;
+  final DateTime startsAt;
+  final int seatCapacity;
+  final String approvalStatus;
+  final bool isPublished;
+
+  factory ManagedEvent.fromJson(JsonObject json) => ManagedEvent(
+        id: json['id'] as String,
+        clubId: json['club_id'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String,
+        venue: json['venue'] as String,
+        startsAt: DateTime.parse(json['starts_at'] as String),
+        seatCapacity: json['seat_capacity'] as int,
+        approvalStatus: json['approval_status'] as String,
+        isPublished: json['is_published'] as bool,
+      );
+}
+
+class PendingReviewPage {
+  const PendingReviewPage({required this.events, required this.total});
+
+  final List<ManagedEvent> events;
+  final int total;
+
+  factory PendingReviewPage.fromJson(JsonObject json) => PendingReviewPage(
+        events: (json['events'] as List<dynamic>)
+            .map((entry) => ManagedEvent.fromJson(entry as JsonObject))
+            .toList(),
+        total: json['total'] as int,
+      );
+}
+
 class CampusApi {
   CampusApi({ApiTransport? transport, Uri? baseUri})
     : _transport = transport ?? IoApiTransport(),
@@ -353,6 +403,73 @@ class CampusApi {
 
   Future<void> logout(String token) async {
     await _request('POST', '/api/v1/auth/logout', token: token);
+  }
+
+  Future<ManagedEvent> createDraftEvent({
+    required String token,
+    required String clubId,
+    required String title,
+    required String description,
+    required String venue,
+    required DateTime startsAt,
+    required int seatCapacity,
+  }) async {
+    final json = await _request(
+      'POST',
+      '/api/v1/clubs/${Uri.encodeComponent(clubId)}/events',
+      token: token,
+      body: {
+        'title': title.trim(),
+        'description': description.trim(),
+        'venue': venue.trim(),
+        'starts_at': startsAt.toUtc().toIso8601String(),
+        'seat_capacity': seatCapacity,
+      },
+    );
+    return ManagedEvent.fromJson(json);
+  }
+
+  Future<ManagedEvent> submitDraftEvent(
+    String token,
+    String clubId,
+    String eventId,
+  ) async {
+    final json = await _request(
+      'POST',
+      '/api/v1/clubs/${Uri.encodeComponent(clubId)}/events/${Uri.encodeComponent(eventId)}/submit',
+      token: token,
+    );
+    return ManagedEvent.fromJson(json);
+  }
+
+  Future<PendingReviewPage> pendingEventReviews(
+    String token, {
+    int page = 1,
+  }) async {
+    final json = await _request(
+      'GET',
+      '/api/v1/student-affairs/events/pending',
+      token: token,
+      query: {'page': '$page', 'page_size': '20'},
+    );
+    return PendingReviewPage.fromJson(json);
+  }
+
+  Future<ManagedEvent> reviewEvent(
+    String token,
+    String eventId, {
+    required String decision,
+  }) async {
+    if (decision != 'approve' && decision != 'reject') {
+      throw const ApiFailure('Invalid event review decision.');
+    }
+    final json = await _request(
+      'POST',
+      '/api/v1/student-affairs/events/${Uri.encodeComponent(eventId)}/review',
+      token: token,
+      body: {'decision': decision},
+    );
+    return ManagedEvent.fromJson(json);
   }
 
   Future<ClubPage> clubs(String token, {int page = 1}) async {

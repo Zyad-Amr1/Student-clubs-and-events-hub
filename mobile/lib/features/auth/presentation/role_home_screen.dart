@@ -2,6 +2,8 @@ import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
+import 'package:campusconnect/features/events/presentation/create_event_screen.dart';
+import 'package:campusconnect/features/events/presentation/review_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class RoleHomeScreen extends StatefulWidget {
@@ -101,8 +103,12 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                     key: ValueKey('managed-club-${club.id}'),
                     leading: const Icon(Icons.groups_outlined),
                     title: Text(club.name),
-                    subtitle: const Text(
-                      'Club-scoped administrator access verified',
+                    subtitle: const Text('Create and submit events for review'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => CreateEventScreen(club: club),
+                      ),
                     ),
                   ),
                 ),
@@ -111,11 +117,22 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 child: ListTile(
                   leading: Icon(Icons.verified_user_outlined),
                   title: Text('Student Affairs access verified'),
-                  subtitle: Text(
-                    'Approval and oversight tools are not available in this foundation.',
-                  ),
+                  subtitle: Text('Review submitted events for publication'),
                 ),
               ),
+            if (!admin) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const ValueKey('open-pending-review'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ReviewEventsScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Review pending events'),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(
