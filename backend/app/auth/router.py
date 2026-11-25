@@ -14,11 +14,13 @@ from app.auth.tokens import ACCESS_TOKEN_TTL, issue_token, utcnow
 from app.config import AuthenticationConfigurationError
 from app.auth.schemas import (
     AuthenticatedUser, LoginRequest, RegisteredStudent,
-    StudentRegistrationRequest, TokenResponse,
+    StudentRegistrationRequest, TokenResponse, ManagedClubsResponse,
 )
 from app.database import get_db
 from app.models.auth_session import AuthSession
 from app.models.user import AccountType, User
+from app.models.club import Club
+from app.models.club_administrator import ClubAdministrator
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -109,3 +111,37 @@ def logout(
     """Revoke this token immediately without invalidating other sessions."""
     identity.session.revoked_at = utcnow()
     db.commit()
+
+
+@router.get(
+    "/club-admin/clubs",
+    response_model=ManagedClubsResponse,
+    responses={
+        401: {"description": "Missing, expired or revoked session"},
+        403: {"description": "No active club administrator membership"},
+    },
+)
+def get_managed_clubs(
+    identity: AuthenticatedIdentity = Depends(current_identity),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Resolve current club-scoped privileges from the database on every request.
+
+    This is not a role-granting endpoint. Portal selection and JWT claims
+    cannot confer a membership. No inactive clubs are exposed.
+    """
+    if identity.user.account_type != AccountType.STUDENT:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    clubs = db.scalars(
+        select(Club)
+        .join(ClubAdministrator, ClubAdministrator.club_id == Club.id)
+        .where(
+            ClubAdministrator.user_id == identity.user.id,
+            Club.is_active.is_(True),
+        )
+        .order_by(Club.name.asc(), Club.id.asc())
+    ).all()
+    if not clubs:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return {"clubs": clubs}
