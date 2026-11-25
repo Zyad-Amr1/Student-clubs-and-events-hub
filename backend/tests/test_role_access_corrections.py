@@ -217,7 +217,10 @@ def test_provisioning_one_affairs_account_still_works_then_refuses_second(
     monkeypatch.setattr(cli.sys, "stdin", SimpleNamespace(isatty=lambda: True))
     monkeypatch.setattr(cli, "_confirm_target_database", lambda: True)
     monkeypatch.setattr(cli, "get_engine", lambda: draft_test_engine)
-    supplied = iter(["Disposable Staff", "disposable-staff@example.edu", "DISP-STAFF"])
+    supplied = iter([
+        "Disposable Staff", "disposable-staff@example.edu", "DISP-STAFF",
+        "Disposable Staff", "disposable-staff@example.edu", "DISP-STAFF",
+    ])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(supplied))
     monkeypatch.setattr(cli, "getpass", lambda prompt: "DisposableStaffPassword#123")
     assert cli.main([]) == 0
