@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from getpass import GetPassWarning, getpass
 
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,7 @@ from app.auth.accounts import DuplicateAccountError, create_account
 from app.auth.schemas import AccountCreationInput
 from app.config import DatabaseConfigurationError, get_database_url
 from app.database import get_engine
-from app.models.user import AccountType
+from app.models.user import AccountType, User
 
 
 def _confirm_target_database() -> bool:
@@ -51,6 +52,25 @@ def _confirm_target_database() -> bool:
     return True
 
 
+
+
+def _student_affairs_exists(db: Session) -> bool:
+    """Operational singleton guard, not a concurrent database constraint."""
+    return db.scalar(
+        select(User.id)
+        .where(User.account_type == AccountType.STUDENT_AFFAIRS)
+        .limit(1)
+    ) is not None
+
+
+def _refuse_second_account() -> None:
+    print(
+        "A Student Affairs account already exists. "
+        "Provisioning another account was cancelled. "
+        "Contact the authorized university administrator for recovery.",
+        file=sys.stderr,
+    )
+
 def main(argv: Sequence[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
@@ -62,6 +82,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Use an interactive terminal and pass no arguments.", file=sys.stderr)
         return 1
     if not _confirm_target_database():
+        return 1
+
+    # Fail early before requesting any password or account information.
+    try:
+        with Session(get_engine()) as db:
+            if _student_affairs_exists(db):
+                _refuse_second_account()
+                return 1
+    except (DatabaseConfigurationError, ImportError, SQLAlchemyError, ValueError):
+        print("Provisioning failed. Check database configuration and availability.", file=sys.stderr)
         return 1
 
     try:
@@ -85,6 +115,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         with Session(get_engine()) as db:
+            # Reduce a second-provisioning race after the interactive prompt.
+            # This is deliberately an operational check, not a DB singleton.
+            if _student_affairs_exists(db):
+                _refuse_second_account()
+                return 1
             create_account(db, data, AccountType.STUDENT_AFFAIRS)
     except DuplicateAccountError:
         print("An account with these identifiers already exists.", file=sys.stderr)

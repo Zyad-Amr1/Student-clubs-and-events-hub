@@ -21,7 +21,7 @@ from app.auth.schemas import (
 from app.database import get_db
 from app.models.auth_session import AuthSession
 from app.models.user import AccountType, User
-from app.models.club import Club
+from app.models.club import Club, ClubApprovalStatus
 from app.models.club_administrator import ClubAdministrator
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
@@ -141,6 +141,7 @@ def get_managed_clubs(
         .where(
             ClubAdministrator.user_id == identity.user.id,
             Club.is_active.is_(True),
+            Club.approval_status == ClubApprovalStatus.APPROVED,
         )
         .order_by(Club.name.asc(), Club.id.asc())
     ).all()
@@ -176,6 +177,7 @@ def assign_club_administrator(
         select(Club).where(
             Club.id == club_id,
             Club.is_active.is_(True),
+            Club.approval_status == ClubApprovalStatus.APPROVED,
         ).with_for_update()
     )
     if club is None:
@@ -219,3 +221,36 @@ def assign_club_administrator(
     return ClubAdministratorAssignmentResponse(
         club_id=club.id, user_id=candidate.id
     )
+
+
+@router.delete(
+    "/student-affairs/clubs/{club_id}/administrator",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles(AccountType.STUDENT_AFFAIRS))],
+    responses={
+        401: {"description": "Invalid, expired or revoked JWT"},
+        403: {"description": "Student Affairs role required"},
+        404: {"description": "Club not found"},
+    },
+)
+def revoke_club_administrator(
+    club_id: UUID,
+    db: Session = Depends(get_db),
+) -> None:
+    """Revoke only the club-specific grant, including for inactive/unapproved clubs.
+
+    The club lock serializes this operation with assignment/replacement.
+    A second call is safe: the existing club still returns 204.
+    No Student account, Club, or other club's grant is modified.
+    """
+    club = db.scalar(
+        select(Club).where(Club.id == club_id).with_for_update()
+    )
+    if club is None:
+        raise HTTPException(status_code=404, detail="Club not found")
+    db.execute(
+        delete(ClubAdministrator).where(
+            ClubAdministrator.club_id == club.id
+        )
+    )
+    db.commit()
