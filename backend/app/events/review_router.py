@@ -39,6 +39,7 @@ def pending_event_queue(
     filters = (
         Event.approval_status == EventApprovalStatus.PENDING,
         Event.is_published.is_(False),
+        Event.cancelled_at.is_(None),
         Club.is_active.is_(True),
         Club.approval_status == ClubApprovalStatus.APPROVED,
     )
@@ -89,6 +90,8 @@ def review_pending_event(
     event = db.scalar(select(Event).where(Event.id == event_id).with_for_update())
     if event is None or event.club_id != club.id:
         raise HTTPException(status_code=404, detail="Event not found")
+    if event.cancelled_at is not None:
+        raise HTTPException(status_code=409, detail="Event was cancelled")
     if event.approval_status != EventApprovalStatus.PENDING or event.is_published:
         raise HTTPException(status_code=409, detail="Event is not pending")
 

@@ -352,6 +352,55 @@ def test_archive_cancels_bookings_notices_admin_and_reactivation_keeps_cancellat
     assert state == "cancelled" and audit_count == 2
 
 
+def test_reactivated_club_cannot_submit_or_review_cancelled_events(
+    draft_client, draft_test_engine, scenario,
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    grant_admin(draft_test_engine, ids["club"], ids["owner"])
+    events = f"/api/v1/clubs/{ids['club']}/events"
+    review = "/api/v1/student-affairs/events"
+    lifecycle = f"/api/v1/student-affairs/clubs/{ids['club']}"
+
+    def create_event():
+        response = draft_client.post(events, json=payload(), headers=headers["owner"])
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    draft, pending = create_event(), create_event()
+    assert draft_client.post(f"{events}/{pending}/submit", headers=headers["owner"]).status_code == 200
+    preview = draft_client.post(lifecycle + "/archive-preview", headers=headers["affairs"])
+    assert preview.status_code == 200
+    archived = draft_client.post(lifecycle + "/archive", headers=headers["affairs"], json={
+        "reason": "Building closed", "preview_token": preview.json()["preview_token"],
+    })
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["cancelled_events"] == 2
+    assert draft_client.post(lifecycle + "/reactivate", headers=headers["affairs"], json={}).status_code == 200
+
+    assert draft_client.post(f"{events}/{draft}/submit", headers=headers["owner"]).status_code == 409
+    assert draft_client.post(f"{events}/{draft}/submit", headers=headers["student"]).status_code == 404
+    fresh = create_event()
+    assert draft_client.post(f"{events}/{fresh}/submit", headers=headers["owner"]).status_code == 200
+    queue = draft_client.get(review + "/pending", headers=headers["affairs"]).json()
+    assert queue["total"] == 1
+    assert [event["id"] for event in queue["events"]] == [fresh]
+    for decision in ("approve", "reject"):
+        assert draft_client.post(f"{review}/{pending}/review", headers=headers["affairs"],
+                                 json={"decision": decision}).status_code == 409
+    approved = draft_client.post(f"{review}/{fresh}/review", headers=headers["affairs"],
+                                 json={"decision": "approve"})
+    assert approved.status_code == 200 and approved.json()["is_published"] is True
+    assert draft_client.post(f"/api/v1/events/{fresh}/reservations",
+                             headers=headers["student"]).status_code == 201
+
+    with draft_test_engine.connect() as db:
+        rows = db.execute(text(
+            "SELECT approval_status, is_published, cancellation_reason FROM events "
+            "WHERE cancelled_at IS NOT NULL ORDER BY approval_status"
+        )).all()
+    assert rows == [("draft", False, "Building closed"), ("pending", False, "Building closed")]
+
+
 def test_archive_confirmation_rejects_stale_preview(draft_client, scenario):
     club_id = scenario["ids"]["club"]
     headers = scenario["headers"]

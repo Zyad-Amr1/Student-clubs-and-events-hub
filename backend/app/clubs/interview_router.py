@@ -229,22 +229,24 @@ def save_day(club_id: UUID, day_date: date, data: DaySetup, identity: Student, d
     return response
 
 
-def _owned_application(db: DB, application_id: UUID, student_id: UUID, *, lock=False):
+def _owned_application(db: DB, application_id: UUID, student_id: UUID) -> Application:
     application = db.scalar(select(Application).where(
         Application.id == application_id, Application.student_id == student_id,
     ))
     if application is None:
         raise HTTPException(404, "Application not found.")
-    club_query = select(Club).where(
+    return application
+
+
+def _lock_bookable_application(db: DB, application_id: UUID, student_id: UUID) -> Application:
+    application = _owned_application(db, application_id, student_id)
+    club = db.scalar(select(Club).where(
         Club.id == application.club_id, Club.is_active.is_(True),
         Club.approval_status == ClubApprovalStatus.APPROVED,
-    )
-    if lock:
-        club_query = club_query.with_for_update()
-    if db.scalar(club_query) is None:
+    ).with_for_update())
+    if club is None:
         raise HTTPException(404, "Club not available.")
-    if lock:
-        db.refresh(application, with_for_update=True)
+    db.refresh(application, with_for_update=True)
     if application.status != "interview_required":
         raise HTTPException(409, "This application is not eligible for an interview.")
     return application
@@ -270,15 +272,30 @@ def _student_booking(selection: Selection, day: Day, reason: str | None, now: da
 @router.get(SELF)
 def student_interview(application_id: UUID, identity: Student, db: DB):
     application = _owned_application(db, application_id, identity.user.id)
+    club = db.get(Club, application.club_id)
+    if club is None or club.approval_status != ClubApprovalStatus.APPROVED:
+        raise HTTPException(404, "Club not available.")
+    if club.is_active and application.status != "interview_required":
+        raise HTTPException(409, "This application is not eligible for an interview.")
+
     now = utcnow()
+    history = (select(Selection, Day, Cancellation.reason)
+        .join(Day, Day.id == Selection.day_id)
+        .outerjoin(Cancellation, Cancellation.id == Selection.cancellation_id)
+        .where(Selection.application_id == application.id))
+    if not club.is_active:
+        history = history.where(Selection.cancellation_id.is_not(None))
+    latest = db.execute(history.order_by(
+        Selection.selected_at.desc(), Selection.id.desc(),
+    ).limit(1)).first()
+    if not club.is_active:
+        if latest is None:
+            raise HTTPException(404, "Club not available.")
+        return {"days": [], "booking": _student_booking(*latest, now)}
+
     days = db.scalars(select(Day).where(
         Day.club_id == application.club_id, Day.day >= now.date(), Day.cancelled_at.is_(None),
     ).order_by(Day.day)).all()
-    latest = db.execute(select(Selection, Day, Cancellation.reason)
-        .join(Day, Day.id == Selection.day_id)
-        .outerjoin(Cancellation, Cancellation.id == Selection.cancellation_id)
-        .where(Selection.application_id == application.id)
-        .order_by(Selection.selected_at.desc(), Selection.id.desc()).limit(1)).first()
     return {
         "days": [StudentDay(id=day.id, day=day.day,
                             seats_available=day.capacity - _active_count(db, day.id)) for day in days],
@@ -288,7 +305,7 @@ def student_interview(application_id: UUID, identity: Student, db: DB):
 
 @router.put(SELF)
 def choose_day(application_id: UUID, data: PickDay, identity: Student, db: DB):
-    application = _owned_application(db, application_id, identity.user.id, lock=True)
+    application = _lock_bookable_application(db, application_id, identity.user.id)
     day = _day(db, application.club_id, data.day_id)
     now = utcnow()
     if day.cancelled_at is not None:
@@ -315,7 +332,7 @@ def choose_day(application_id: UUID, data: PickDay, identity: Student, db: DB):
 
 @router.delete(SELF, status_code=204)
 def withdraw_selection(application_id: UUID, identity: Student, db: DB):
-    application = _owned_application(db, application_id, identity.user.id, lock=True)
+    application = _lock_bookable_application(db, application_id, identity.user.id)
     current = _selection(db, application.id)
     if current is None:
         return
