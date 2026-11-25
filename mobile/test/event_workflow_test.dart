@@ -331,7 +331,8 @@ void main() {
       );
       expect(createIndex, greaterThanOrEqualTo(0));
       expect(transport.methods[createIndex], 'POST');
-      final payload = jsonDecode(transport.bodies[createIndex]!) as Map;
+      final payload =
+          jsonDecode(transport.bodies[createIndex]!) as Map<String, dynamic>;
       expect(payload['title'], 'AI Workshop');
       expect(payload['description'], 'Practical project session');
       expect(payload['venue'], 'Engineering Hall');
@@ -382,10 +383,7 @@ void main() {
     await tester.ensureVisible(reject);
     await tester.tap(reject);
     await tester.pumpAndSettle();
-    expect(
-      find.text('AI Workshop: rejected and unpublished'),
-      findsOneWidget,
-    );
+    expect(find.text('AI Workshop: rejected and unpublished'), findsOneWidget);
     expect(find.text('No pending events to review.'), findsOneWidget);
     expect(find.text('Awaiting review: 0'), findsOneWidget);
     expect(pending, findsNothing);
