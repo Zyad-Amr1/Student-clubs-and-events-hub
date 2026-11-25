@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.accounts import DuplicateAccountError, create_account
 from app.auth.dependencies import AuthenticatedIdentity, current_identity, require_roles
-from app.auth.passwords import hash_password, verify_password
+from app.auth.passwords import PasswordHashCapacityError, hash_password, verify_password
 from app.auth.tokens import ACCESS_TOKEN_TTL, issue_token, utcnow
 from app.config import AuthenticationConfigurationError
 from app.auth.schemas import (
@@ -27,6 +27,15 @@ from app.models.club_administrator import ClubAdministrator
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
+
+def _hash_capacity_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail="Authentication temporarily unavailable",
+        headers={"Retry-After": "1"},
+    )
+
+
 @router.post(
     "/register",
     response_model=RegisteredStudent,
@@ -40,6 +49,8 @@ def register_student(
     """Create a Student. Unique constraints enforce duplicates atomically."""
     try:
         user = create_account(db, data, AccountType.STUDENT)
+    except PasswordHashCapacityError:
+        raise _hash_capacity_unavailable() from None
     except DuplicateAccountError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -62,12 +73,14 @@ def _bad_login() -> HTTPException:
 def login(data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Issue a revocable, expiring JWT for a valid, active account."""
     user = db.scalar(select(User).where(User.email == data.email))
-    if user is None:
-        # Perform the same memory-hard work even for an unknown email.
-        hash_password(data.password)
-        raise _bad_login()
-
-    verified = verify_password(data.password, user.password_hash)
+    try:
+        if user is None:
+            # Match the cost for unknown emails to avoid account enumeration.
+            hash_password(data.password)
+            raise _bad_login()
+        verified = verify_password(data.password, user.password_hash)
+    except PasswordHashCapacityError:
+        raise _hash_capacity_unavailable() from None
     if not verified or not user.is_active:
         raise _bad_login()
 

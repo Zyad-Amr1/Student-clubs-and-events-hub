@@ -23,6 +23,7 @@ def configure_prompts(monkeypatch, *, email="synthetic@example.edu", confirmatio
     # These legacy tests mock the account creation behavior. The singleton
     # check is exercised against disposable PostgreSQL separately.
     monkeypatch.setattr(cli, "_student_affairs_exists", lambda db: False)
+    monkeypatch.setattr(cli, "_lock_student_affairs_provisioning", lambda db: None)
 
 
 def test_provisioning_confirms_target_before_collecting_account_details(monkeypatch, capsys):

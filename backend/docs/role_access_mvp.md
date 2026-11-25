@@ -49,3 +49,30 @@ preferred administrator. If a non-disposable database ever requires migration,
 review duplicate-grant records with the authorized Student Affairs operator
 before **separately approving** any migration. Never use the existing
 `campusconnect_db` for tests or demonstrations.
+
+## Public authentication resource bounds
+
+For public POST `/api/v1/auth/login` and `/register`, a minimal in-memory
+fixed rolling 60-second window allows 20 login and 8 registration attempts
+per *real ASGI connection peer*, respectively. Malformed requests and
+nonexistent email addresses count. Excess attempts return HTTP 429 with a
+`Retry-After` header; excess tracked peers fail closed with HTTP 503.
+Client-submitted forwarding headers are not consulted by the application.
+If deployed behind a proxy, configure the ASGI server's trusted proxy list
+correctly or all users sharing a proxy may share one quota. Enforcement is
+**in-process/per worker**, not distributed: multiple workers/replicas have
+independent counters. Deployment-wide blocking requires external coordination
+in the future. These bounds are for a small university MVP, not a global
+anti-abuse service.
+
+At most **two** simultaneous scrypt calls may run in a Python process; extra
+password-hash work fails promptly with HTTP 503 (`Retry-After: 1`) rather
+than queueing unbounded expensive allocations. scrypt work factors and stored
+hash format remain unchanged. The administrative provisioning CLI reports a
+safe error on local hash capacity exhaustion.
+
+Trusted Student Affairs CLI provisioning also uses a PostgreSQL transaction-
+scoped advisory lock held from the singleton check through insertion/commit.
+Two concurrent CLI processes against the **same database** cannot both create
+the initial account. This does not prevent privileged direct database writes
+from bypassing the policy and is not a database-level singleton constraint.
