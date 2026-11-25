@@ -25,9 +25,13 @@ jobs:
       - name: Resolve Flutter dependencies
         working-directory: mobile
         run: flutter pub get
-      - name: Check Dart formatting
+      - name: Dart formatter diagnostic for event workflow
         working-directory: mobile
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: |
+          dart format lib test
+          echo '===EVENT_FORMAT_START==='
+          git -c color.ui=false diff -- lib test
+          echo '===EVENT_FORMAT_END==='
       - name: Flutter analyzer
         working-directory: mobile
         run: flutter analyze
