@@ -88,7 +88,8 @@ class WelcomeScreen extends StatelessWidget {
                   label: const Text('Student portal'),
                 ),
               ),
-              const SizedBox(height: 12              SizedBox(
+              const SizedBox(height: 12),
+              SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   key: const ValueKey<String>('open-club-admin-auth'),
