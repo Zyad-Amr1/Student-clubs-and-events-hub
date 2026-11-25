@@ -1,5 +1,6 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/features/clubs/presentation/interview_screens.dart';
 import 'package:material_ui/material_ui.dart';
 
 class MembershipScreen extends StatefulWidget {
@@ -168,6 +169,17 @@ class _MembershipScreenState extends State<MembershipScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(application.statusLabel),
+                        if (!admin &&
+                            application.status == 'interview_required')
+                          TextButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    StudentInterviewScreen(application),
+                              ),
+                            ),
+                            child: const Text('Manage interview'),
+                          ),
                         Text(
                           MaterialLocalizations.of(
                             context,

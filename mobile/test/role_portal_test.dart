@@ -286,7 +286,10 @@ void main() {
       expect(find.text('Club Admin portal'), findsOneWidget);
       expect(find.text('Verified Robotics Club'), findsOneWidget);
       expect(store.portal, 'clubAdmin');
-      await tester.tap(find.byKey(const ValueKey('role-logout')));
+      final logout = find.byKey(const ValueKey('role-logout'));
+      await tester.scrollUntilVisible(logout, 180);
+      await tester.pumpAndSettle();
+      await tester.tap(logout);
       await tester.pumpAndSettle();
       expect(store.token, isNull);
       expect(find.text('Your campus community starts here.'), findsOneWidget);

@@ -12,6 +12,7 @@ from app.auth.profile_router import router as profile_router
 from app.clubs.router import router as clubs_router
 from app.clubs.management_router import router as club_management_router
 from app.clubs.membership_router import router as membership_router
+from app.clubs.interview_router import router as interview_router
 from app.events.router import router as events_router
 from app.events.reservation_router import router as event_reservation_router
 from app.events.review_router import router as event_review_router
@@ -27,6 +28,7 @@ app.include_router(profile_router)
 app.include_router(clubs_router)
 app.include_router(club_management_router)
 app.include_router(membership_router)
+app.include_router(interview_router)
 app.include_router(events_router)
 app.include_router(event_reservation_router)
 app.include_router(event_review_router)

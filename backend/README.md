@@ -499,3 +499,41 @@ Alembic revision `0008_club_requests` adds the request history table after
 per student and one pending request per normalized name. An advisory
 transaction lock protects the handoff from pending request to active club,
 and row locks serialize competing decisions and withdrawals.
+
+## Membership applications and interview booking
+
+Students submit from Club Details using `POST /api/v1/clubs/{id}/applications`.
+`GET /api/v1/me/applications` shows their history. `GET /api/v1/me/memberships`
+shows accepted applications as memberships. Club admins use
+`GET /api/v1/club-admin/clubs/{id}/applications` and post a decision of
+`accepted` or `interview_required` to `…/applications/{application_id}/decision`.
+The original submission time and review milestones are retained. This foundation
+has one application per student and club. Reapplication, rejection and
+post-interview membership decisions require separate lifecycle rules.
+
+Interview days use **UTC** for both the calendar date and the configured
+availability windows. Admins manage these through
+`GET /api/v1/club-admin/clubs/{id}/interview-days` and
+`PUT …/interview-days/by-date/{YYYY-MM-DD}`. The update sends `capacity`,
+`duration_minutes`, and `periods` with `start_minute` and `end_minute` measured
+from midnight UTC. A day can be published before its availability is configured.
+
+An eligible applicant uses `GET/PUT/DELETE /api/v1/me/applications/{id}/interview`
+to see/select/change a day or withdraw their unpublished selection. PUT takes
+only `day_id`. Selecting a day reserves capacity without assigning a time.
+The admin previews via `GET …/interview-days/{day_id}/schedule` and publishes
+all or a subset via POST to the same route, passing selection IDs and their
+previewed start and end timestamps. Publication rejects stale previews and
+checks existing appointments across both the club and the applicant.
+Published appointments retain their times when the schedule regenerates.
+
+The Student Calendar opens Interview Calendar, which loads confirmation
+notices and published times from `GET /api/v1/me/interview-appointments`.
+Unpublished times are private to the administrator. Changes and cancellations
+after publication, attendance and reminders belong to later stories.
+
+Migration `0009_membership_applications` adds membership records after `0008`.
+Migration `0010_interview_booking` adds days, preserved day selection history,
+and confirmed times. Club row locks serialize day selections and capacity
+edits. An advisory transaction lock serializes publication across clubs to
+prevent one applicant from receiving overlapping appointments.
