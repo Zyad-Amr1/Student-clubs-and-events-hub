@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.auth.public_limits import check_public_auth_rate
 
 from app.auth.router import router as auth_router
+from app.auth.profile_router import router as profile_router
 from app.clubs.router import router as clubs_router
 from app.events.router import router as events_router
 from app.events.reservation_router import router as event_reservation_router
@@ -20,6 +21,7 @@ from app.database import get_engine
 
 app = FastAPI(title="CampusConnect API", version="0.1.0")
 app.include_router(auth_router)
+app.include_router(profile_router)
 app.include_router(clubs_router)
 app.include_router(events_router)
 app.include_router(event_reservation_router)
@@ -37,7 +39,10 @@ async def throttle_public_auth(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def sanitize_registration_validation(request: Request, exc: RequestValidationError):
     """Do not echo submitted passwords in FastAPI's 422 validation payload."""
-    if request.url.path not in {"/api/v1/auth/register", "/api/v1/auth/login"}:
+    if request.url.path not in {
+        "/api/v1/auth/register", "/api/v1/auth/login",
+        "/api/v1/auth/me", "/api/v1/auth/me/password",
+    }:
         return await request_validation_exception_handler(request, exc)
     errors = [
         {key: error[key] for key in ("type", "loc", "msg") if key in error}

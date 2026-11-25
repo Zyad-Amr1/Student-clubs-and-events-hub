@@ -239,6 +239,39 @@ class StudentSession extends ChangeNotifier {
     });
   }
 
+  Future<void> updateProfile(JsonObject data) async {
+    final profile = await authenticated(
+      (token) => api.updateProfile(token, data),
+    );
+    if (!signedIn || _profile?.id != profile.id) return;
+    _profile = profile;
+    notifyListeners();
+  }
+
+  Future<void> switchStudentMode(PortalRole target) async {
+    if (_profile?.accountType != 'student' ||
+        target == PortalRole.studentAffairs) {
+      throw const ApiFailure('Student account required.');
+    }
+    await authenticated((token) async {
+      final clubs = target == PortalRole.clubAdmin
+          ? await api.myManagedClubs(token)
+          : <ManagedClub>[];
+      if (target == PortalRole.clubAdmin && clubs.isEmpty) return;
+      if (_token != token) return;
+      if (store is PortalPreferenceStore) {
+        await (store as PortalPreferenceStore).writePortal(target.name);
+      }
+      if (_token != token) return;
+      _managedClubs = clubs;
+      _portal = target;
+      notifyListeners();
+    });
+    if (_portal != target) {
+      throw const ApiFailure('No active club administrator assignment.');
+    }
+  }
+
   Future<void> _dropLocalSession() async {
     _token = null;
     _profile = null;

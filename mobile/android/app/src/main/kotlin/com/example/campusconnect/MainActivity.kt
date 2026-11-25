@@ -1,5 +1,9 @@
 package com.example.campusconnect
 
+import android.app.Activity
+import android.content.Intent
+import java.io.ByteArrayOutputStream
+
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -14,6 +18,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** Android-only secure session persistence without adding a third-party plugin. */
 class MainActivity : FlutterActivity() {
+    private var imageResult: MethodChannel.Result? = null
     private val channelName = "campusconnect/secure_token"
     private val keyAlias = "campusconnect_session_aes_v1"
     private val preferences by lazy {
@@ -22,6 +27,27 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "campusconnect/images")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "pick") {
+                    result.notImplemented()
+                } else if (imageResult != null) {
+                    result.error("BUSY", "An image selection is already open", null)
+                } else {
+                    try {
+                        imageResult = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png"))
+                        }
+                        startActivityForResult(intent, 812)
+                    } catch (_: Exception) {
+                        imageResult = null
+                        result.error("PICKER", "Could not open image picker", null)
+                    }
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 try {
@@ -56,6 +82,37 @@ class MainActivity : FlutterActivity() {
                     result.error("STORAGE_UNAVAILABLE", "Android secure storage failed", null)
                 }
             }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 812) return
+        val result = imageResult ?: return
+        imageResult = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            result.success(null)
+            return
+        }
+        try {
+            val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val length = input.read(buffer)
+                    if (length < 0) break
+                    if (output.size() + length > 512 * 1024) {
+                        result.error("SIZE", "Choose an image up to 512 KiB", null)
+                        return
+                    }
+                    output.write(buffer, 0, length)
+                }
+                output.toByteArray()
+            } ?: throw IllegalStateException("Image unavailable")
+            result.success(bytes)
+        } catch (_: Exception) {
+            result.error("READ", "Could not read selected image", null)
+        }
     }
 
     private fun key(): SecretKey {

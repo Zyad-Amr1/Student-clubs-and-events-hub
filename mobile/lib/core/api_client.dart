@@ -86,6 +86,10 @@ class StudentProfile {
     required this.email,
     required this.universityId,
     required this.accountType,
+    this.faculty,
+    this.department,
+    this.academicYear,
+    this.picture,
   });
 
   final String id;
@@ -93,6 +97,10 @@ class StudentProfile {
   final String email;
   final String universityId;
   final String accountType;
+  final String? faculty;
+  final String? department;
+  final int? academicYear;
+  final String? picture;
 
   factory StudentProfile.fromJson(JsonObject json) => StudentProfile(
     id: json['id'] as String,
@@ -100,6 +108,10 @@ class StudentProfile {
     email: json['email'] as String,
     universityId: json['university_id'] as String,
     accountType: json['account_type'] as String,
+    faculty: json['faculty'] as String?,
+    department: json['department'] as String?,
+    academicYear: json['academic_year'] as int?,
+    picture: json['profile_picture_url'] as String?,
   );
 }
 
@@ -409,6 +421,35 @@ class CampusApi {
   Future<StudentProfile> profile(String token) async => StudentProfile.fromJson(
     await _request('GET', '/api/v1/auth/me', token: token),
   );
+
+  Future<StudentProfile> updateProfile(String token, JsonObject data) async =>
+      StudentProfile.fromJson(
+        await _request('PUT', '/api/v1/auth/me', token: token, body: data),
+      );
+
+  Future<JsonObject> academicCatalog(String token) =>
+      _request('GET', '/api/v1/auth/academic-catalog', token: token);
+
+  Future<void> changePassword(String token, JsonObject data) async {
+    await _request(
+      'POST',
+      '/api/v1/auth/me/password',
+      token: token,
+      body: data,
+    );
+  }
+
+  Future<List<ManagedClub>> myManagedClubs(String token) async {
+    final data = await _request(
+      'GET',
+      '/api/v1/auth/me/managed-clubs',
+      token: token,
+    );
+    return (data['clubs'] as List)
+        .cast<JsonObject>()
+        .map(ManagedClub.fromJson)
+        .toList();
+  }
 
   Future<List<ManagedClub>> managedClubs(String token) async {
     final json = await _request(

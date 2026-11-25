@@ -2,6 +2,7 @@ import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
+import 'package:campusconnect/features/auth/presentation/account_screens.dart';
 import 'package:campusconnect/features/events/presentation/create_event_screen.dart';
 import 'package:campusconnect/features/events/presentation/review_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -92,6 +93,32 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
             ),
             const SizedBox(height: 20),
             if (admin) ...[
+              TextButton(
+                onPressed: _checking
+                    ? null
+                    : () async {
+                        setState(() => _checking = true);
+                        try {
+                          await session.switchStudentMode(PortalRole.student);
+                          if (context.mounted) {
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              AppRoutes.home,
+                              (_) => false,
+                            );
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            setState(
+                              () =>
+                                  _error = 'Could not switch to Student Mode.',
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _checking = false);
+                        }
+                      },
+                child: const Text('Switch Back to Student Mode'),
+              ),
               Text(
                 'Clubs you administer',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -148,6 +175,14 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
               label: Text(_checking ? 'Checking...' : 'Recheck permissions'),
             ),
             const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AccountSettingsScreen(),
+                ),
+              ),
+              child: const Text('Account Settings'),
+            ),
             FilledButton.icon(
               key: const ValueKey('role-logout'),
               onPressed: _checking ? null : _logout,

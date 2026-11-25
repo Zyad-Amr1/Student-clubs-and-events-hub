@@ -1,6 +1,9 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/core/portal_role.dart';
+import 'package:campusconnect/features/auth/presentation/account_screens.dart';
+import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -12,6 +15,53 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _loggingOut = false;
+  bool _hasClub = false;
+  bool _switching = false;
+  String? _clubError;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkClubs();
+    });
+  }
+
+  Future<void> _checkClubs() async {
+    final session = StudentSessionScope.of(context);
+    if (session.profile?.accountType != 'student') return;
+    try {
+      final clubs = await session.authenticated(session.api.myManagedClubs);
+      if (mounted) {
+        setState(() {
+          _hasClub = clubs.isNotEmpty;
+          _clubError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _hasClub = false);
+    }
+  }
+
+  Future<void> _manage() async {
+    setState(() {
+      _switching = true;
+      _clubError = null;
+    });
+    try {
+      await StudentSessionScope.of(context)
+          .switchStudentMode(PortalRole.clubAdmin);
+      if (mounted) {
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) setState(() => _clubError = error.message);
+      if (mounted) await _checkClubs();
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
 
   Future<void> _logout() async {
     setState(() => _loggingOut = true);
@@ -53,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Icon(Icons.account_circle_outlined, size: 72),
+            Center(child: UploadedImage(user.picture)),
             const SizedBox(height: 16),
             Text(
               user.fullName,
@@ -71,6 +121,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
               leading: const Icon(Icons.badge_outlined),
               title: const Text('University ID'),
               subtitle: Text(user.universityId),
+            ),
+            if (user.accountType == 'student') ...[
+              Text(_hasClub ? 'Student · Club Admin' : 'Student'),
+              if (user.faculty != null) Text('Faculty · ${user.faculty}'),
+              if (user.department != null)
+                Text('Department · ${user.department}'),
+              if (user.academicYear != null)
+                Text('Academic year · ${user.academicYear}'),
+              ListTile(
+                title: const Text('Edit Profile'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => EditProfileScreen(user),
+                  ),
+                ),
+              ),
+              if (_hasClub)
+                ListTile(
+                  title: const Text('Manage My Club'),
+                  onTap: _switching ? null : _manage,
+                ),
+              if (_clubError != null) Text(_clubError!),
+            ],
+            ListTile(
+              title: const Text('Account Settings'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AccountSettingsScreen(),
+                ),
+              ),
             ),
             const SizedBox(height: 30),
             OutlinedButton.icon(

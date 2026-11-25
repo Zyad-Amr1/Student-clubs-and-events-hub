@@ -450,3 +450,25 @@ seat counts. Promotion updates the earliest eligible queue entry and commits
 with the cancellation, so concurrent requests cannot oversubscribe a published
 event through these APIs. Cancelling deletes the active reservation row, which
 allows the Student to register again later.
+
+## Student account management
+
+Authenticated students use `GET /api/v1/auth/me` and
+`PUT /api/v1/auth/me` for their own profile. The update replaces the name and
+optional academic fields. Email and university ID are read-only. Omit
+`picture_base64` to keep the current avatar or send null to remove it. Uploaded
+JPEG/PNG files are limited to 512 KiB and 2048 × 2048 pixels and stored as small,
+re-encoded JPEGs without their original metadata.
+
+`GET /api/v1/auth/academic-catalog` provides the university demo catalog.
+It includes Engineering (Computer, Electrical and Mechanical Engineering),
+Science (Computer Science, Mathematics and Physics), Business (Accounting and
+Management), and academic years 1 through 5. These fields remain optional.
+
+`POST /api/v1/auth/me/password` takes `current_password`, `new_password`, and
+`confirm_password`. An incorrect current password returns 400. The current
+session continues until logout or expiry. `POST /api/v1/auth/logout` revokes
+the calling session.
+
+`GET /api/v1/auth/me/managed-clubs` lists the caller's current active,
+approved club assignments (possibly empty) for the Student Profile.
