@@ -4,6 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+part 'membership_api.dart';
+part 'interview_api.dart';
+
 typedef JsonObject = Map<String, dynamic>;
 
 class ApiFailure implements Exception {
@@ -620,12 +623,22 @@ class CampusApi {
     await _request('DELETE', _reservationPath(eventId), token: token);
   }
 
-  Future<ClubPage> clubs(String token, {int page = 1}) async {
+  Future<ClubPage> clubs(
+    String token, {
+    int page = 1,
+    String search = '',
+    String category = '',
+  }) async {
     final json = await _request(
       'GET',
       '/api/v1/clubs',
       token: token,
-      query: {'page': '$page', 'page_size': '20'},
+      query: {
+        'page': '$page',
+        'page_size': '20',
+        if (search.trim().isNotEmpty) 'search': search.trim(),
+        if (category.trim().isNotEmpty) 'category': category.trim(),
+      },
     );
     return ClubPage.fromJson(json);
   }

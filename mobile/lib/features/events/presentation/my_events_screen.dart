@@ -1,5 +1,6 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/features/clubs/presentation/interview_screens.dart';
 import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -69,6 +70,15 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
       appBar: AppBar(
         title: const Text('My Events Calendar'),
         actions: [
+          IconButton(
+            tooltip: 'Interview Calendar',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const InterviewAppointmentsScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.event_available_outlined),
+          ),
           IconButton(
             tooltip: 'Refresh calendar',
             onPressed: _loading ? null : _load,
