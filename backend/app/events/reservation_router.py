@@ -33,13 +33,23 @@ def _require_student(identity: AuthenticatedIdentity) -> None:
 
 
 def _event_and_club(db: Session, event_id: UUID, *, lock_event: bool):
+    if lock_event:
+        # Use the same lock order as club archive and club scoped writes:
+        # Club first, then Event. This serializes archive vs RSVP without a
+        # cycle where each transaction holds one row and waits for the other.
+        club_id = db.scalar(select(Event.club_id).where(Event.id == event_id))
+        if club_id is None:
+            return None
+        club = db.scalar(select(Club).where(Club.id == club_id).with_for_update())
+        event = db.scalar(select(Event).where(Event.id == event_id).with_for_update())
+        if club is None or event is None:
+            return None
+        return event, club
     statement = (
         select(Event, Club)
         .join(Club, Club.id == Event.club_id)
         .where(Event.id == event_id)
     )
-    if lock_event:
-        statement = statement.with_for_update(of=Event)
     return db.execute(statement).first()
 
 
@@ -192,6 +202,8 @@ def cancel_event_reservation(
     )
     if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.status == "cancelled":
+        raise HTTPException(status_code=409, detail="This event reservation was cancelled")
 
     released_confirmed_seat = reservation.status == _CONFIRMED
     db.delete(reservation)

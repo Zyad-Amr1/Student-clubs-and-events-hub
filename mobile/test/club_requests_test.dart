@@ -8,6 +8,54 @@ import 'package:material_ui/material_ui.dart';
 import 'api_client_test.dart';
 
 void main() {
+  testWidgets('Student sees club cancellation and archive reasons in notices', (
+    tester,
+  ) async {
+    final transport = FakeApiTransport((call) {
+      switch ((call.method, call.uri.path)) {
+        case ('GET', '/api/v1/auth/me'):
+          return ok(profileJson);
+        case ('GET', '/api/v1/clubs'):
+          return ok({'clubs': [], 'page': 1, 'page_size': 20, 'total': 0});
+        case ('GET', '/api/v1/auth/me/managed-clubs'):
+          return ok({'clubs': []});
+        case ('GET', '/api/v1/me/club-lifecycle-notices'):
+          return ok({
+            'notices': [
+              {
+                'id': 'notice-1',
+                'club_id': 'club-1',
+                'club_name': 'Robotics',
+                'kind': 'activity_cancelled',
+                'message': 'Robotics cancelled Lab Day: Campus closure',
+                'created_at': '2026-11-25T09:00:00Z',
+              },
+            ],
+          });
+        default:
+          fail('Unexpected request: ${call.method} ${call.uri.path}');
+      }
+    });
+
+    await tester.pumpWidget(
+      CampusConnectApp(
+        api: CampusApi(transport: transport),
+        tokenStore: MemoryTokenStore()..token = 'student-test-token',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Club Notifications'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Robotics cancelled Lab Day: Campus closure'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Student Profile submits a club request and shows its history', (
     tester,
   ) async {

@@ -18,11 +18,13 @@ class ReservedEventDetails(BaseModel):
     starts_at: datetime
     ends_at: datetime | None
     seat_capacity: int
+    cancelled_at: datetime | None = None
+    cancellation_reason: str | None = None
 
 
 class EventReservationResponse(BaseModel):
     event_id: UUID
-    status: Literal["confirmed", "waitlisted"]
+    status: Literal["confirmed", "waitlisted", "cancelled"]
     waitlist_position: int | None
     event: ReservedEventDetails
 

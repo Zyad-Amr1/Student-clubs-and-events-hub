@@ -5,6 +5,7 @@ import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/account_screens.dart';
 import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
 import 'package:campusconnect/features/clubs/presentation/membership_screen.dart';
+import 'package:campusconnect/features/clubs/presentation/club_lifecycle_screen.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -179,6 +180,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const MembershipScreen(),
+                  ),
+                ),
+              ),
+              ListTile(
+                title: const Text('Club Notifications'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        const ClubLifecycleScreen(studentNotices: true),
                   ),
                 ),
               ),

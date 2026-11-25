@@ -139,20 +139,22 @@ def submit_draft_event(
     if identity.user.account_type != AccountType.STUDENT:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    event = db.scalar(
-        select(Event)
-        .join(Club, Event.club_id == Club.id)
+    club = db.scalar(
+        select(Club)
         .join(ClubAdministrator, ClubAdministrator.club_id == Club.id)
         .where(
             Club.id == club_id,
             Club.is_active.is_(True),
             Club.approval_status == ClubApprovalStatus.APPROVED,
             ClubAdministrator.user_id == identity.user.id,
-            Event.club_id == club_id,
-            Event.id == event_id,
         )
-        .with_for_update(of=(Club, ClubAdministrator, Event))
+        .with_for_update(of=Club)
     )
+    if club is None:
+        raise HTTPException(status_code=404, detail="Club or event not found")
+    event = db.scalar(select(Event).where(
+        Event.club_id == club_id, Event.id == event_id,
+    ).with_for_update())
     if event is None:
         raise HTTPException(status_code=404, detail="Club or event not found")
 

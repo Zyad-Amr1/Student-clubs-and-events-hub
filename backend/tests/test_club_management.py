@@ -40,7 +40,7 @@ def test_club_request_workflow_and_scope(draft_client, scenario):
     club_id = approved.json()["club_id"]
     assert draft_client.get(f"/api/v1/clubs/{club_id}", headers=other).status_code == 200
     assert draft_client.get("/api/v1/auth/me/managed-clubs", headers=student).json()["clubs"] == [
-        {"id": club_id, "name": "Demo Space Society"}
+        {"id": club_id, "name": "Demo Space Society", "is_active": True, "archive_reason": None}
     ]
     assert draft_client.post(my, headers=other, json=data).status_code == 409
     assert draft_client.put(own_path, headers=student, json=data).status_code == 409

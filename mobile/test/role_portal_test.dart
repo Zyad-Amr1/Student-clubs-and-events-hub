@@ -46,6 +46,7 @@ class PortalTransport implements ApiTransport {
   bool allowAffairs = true;
   bool failLogout = false;
   bool sessionRevoked = false;
+  bool clubArchived = false;
   final List<String> paths = [];
 
   @override
@@ -91,6 +92,38 @@ class PortalTransport implements ApiTransport {
       return allowAffairs
           ? const ApiReply(200, '{"account_type":"student_affairs"}')
           : const ApiReply(403, '{"detail":"Insufficient permissions"}');
+    }
+    if (uri.path == '/api/v1/student-affairs/clubs' && method == 'GET') {
+      return ApiReply(
+        200,
+        jsonEncode({
+          'clubs': [
+            {
+              'id': '22222222-2222-4222-8222-222222222222',
+              'name': 'Verified Robotics Club',
+              'is_active': !clubArchived,
+              'archive_reason': clubArchived ? 'Campus closure' : null,
+            },
+          ],
+        }),
+      );
+    }
+    if (uri.path.endsWith('/archive-preview') && method == 'POST') {
+      return const ApiReply(
+        200,
+        '{"preview_token":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","events":[{"title":"Lab Day","starts_at":"2027-02-01T10:00:00Z"}],"interview_days":[],"affected_students":["Student Example"]}',
+      );
+    }
+    if (uri.path.endsWith('/archive') && method == 'POST') {
+      final request = jsonDecode(body!) as Map<String, dynamic>;
+      if (request['reason'] != 'Campus closure') {
+        return const ApiReply(422, '{"detail":"Reason required"}');
+      }
+      clubArchived = true;
+      return const ApiReply(
+        200,
+        '{"status":"archived","archive_reason":"Campus closure"}',
+      );
     }
     if (uri.path == '/api/v1/auth/logout') {
       if (failLogout) {
@@ -322,6 +355,45 @@ void main() {
     expect(find.text('Student Affairs portal'), findsOneWidget);
     expect(find.text('Student Affairs access verified'), findsOneWidget);
     expect(find.text('Verified Robotics Club'), findsNothing);
+  });
+
+  testWidgets('Student Affairs previews and archives a club with a reason', (
+    tester,
+  ) async {
+    final backend = PortalTransport(accountType: 'student_affairs');
+    await tester.pumpWidget(
+      CampusConnectApp(
+        api: portalApi(backend),
+        tokenStore: PortalMemoryStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-student-affairs-auth')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email')),
+      'affairs@example.edu',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password')),
+      'password',
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pumpAndSettle();
+    final manage = find.text('Manage Club Lifecycle');
+    await tester.ensureVisible(manage);
+    await tester.tap(manage);
+    await tester.pumpAndSettle();
+    expect(find.text('Verified Robotics Club'), findsOneWidget);
+    await tester.tap(find.text('Archive'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Lab Day'), findsOneWidget);
+    expect(find.textContaining('Student Example'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Campus closure');
+    await tester.tap(find.text('Confirm archive'));
+    await tester.pumpAndSettle();
+    expect(find.text('Archived: Campus closure'), findsOneWidget);
+    expect(backend.clubArchived, isTrue);
   });
   test(
     'Normal logout clears storage, in-memory identity and revokes JWT',

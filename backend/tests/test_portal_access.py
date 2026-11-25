@@ -31,12 +31,13 @@ def test_member_sees_only_active_assigned_clubs(
             {
                 "id": str(ids["club"]),
                 "name": "Authorized BDD Robotics Club",
+                "is_active": True,
+                "archive_reason": None,
             }
         ]
     }
     assert "password" not in response.text
     assert "user_id" not in response.text
-    assert "is_active" not in response.text
 
 
 def test_student_without_membership_cannot_enter_admin_portal(draft_client, scenario):
@@ -78,6 +79,23 @@ def test_an_inactive_club_only_does_not_grant_portal_access(
     ids = scenario["ids"]
     grant_admin(draft_test_engine, ids["inactive"], ids["owner"])
     assert route(draft_client, scenario["headers"]["owner"]).status_code == 403
+
+
+def test_archived_club_remains_visible_read_only_to_its_original_admin(
+    draft_client, draft_test_engine, scenario,
+):
+    ids, headers = scenario["ids"], scenario["headers"]
+    grant_admin(draft_test_engine, ids["club"], ids["owner"])
+    with draft_test_engine.begin() as connection:
+        connection.execute(text(
+            "UPDATE clubs SET is_active=false, archived_at=now(), archive_reason='Campus closure' WHERE id=:club"
+        ), {"club": ids["club"]})
+    response = route(draft_client, headers["owner"])
+    assert response.status_code == 200
+    assert response.json()["clubs"][0]["archive_reason"] == "Campus closure"
+    from test_event_creation import payload
+    create = draft_client.post(f"/api/v1/clubs/{ids['club']}/events", json=payload(), headers=headers["owner"])
+    assert create.status_code == 404
 
 
 def test_other_memberships_and_spoofed_query_cannot_expand_scope(
