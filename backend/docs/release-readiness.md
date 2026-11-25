@@ -38,14 +38,28 @@ The existing suite already covers the requested backend journeys. No duplicate j
 | CAMP-34 | `test_interview_lifecycle.py::test_cancellation_scopes_audit_and_selection_race`, `test_archiving_club_cancels_interviews_without_rejecting_applications` | Scoped cancellation, reasons, audit and archival cancellation | Flutter cancellation preview and reason |
 | CAMP-35 | `test_interview_lifecycle.py::test_expiry_new_day_notices_and_attendance` | Attendance recording and invalid-state handling | Flutter attendance controls |
 | CAMP-36 | `test_interview_lifecycle.py::test_archiving_club_cancels_interviews_without_rejecting_applications` | Interview notification/calendar record and archived historical details | Flutter notification/calendar entry |
-| CAMP-37 | `test_interview_booking.py::test_interview_booking_capacity_fcfs_and_partial_publication` | Schedule adjustment before publication | Flutter adjustment controls |
-| CAMP-38 | No dedicated backend acceptance test located | Two-hour published-schedule edit policy is unverified in backend | Story describes a later-release policy; confirm scope or add implementation and backend/UI acceptance |
-| CAMP-39 | No dedicated backend acceptance test located | Student reschedule-request workflow is unverified in backend | Story describes a later-release policy; confirm scope or add implementation and backend/UI acceptance |
-| CAMP-40 | `test_interview_lifecycle.py::test_cancellation_scopes_audit_and_selection_race` | Cancellation and attendance audit records | Flutter history display |
-| CAMP-41 | No dedicated backend acceptance test located | Second chance after no-show is unverified in backend | Story describes advanced policy; confirm scope or add implementation and backend/UI acceptance |
-| CAMP-42 | No dedicated backend acceptance test located | Automatic rejection/restoration policy is unverified in backend | Story describes advanced policy; confirm scope or add implementation and backend/UI acceptance |
-| CAMP-43 | `test_interview_lifecycle.py::test_archiving_club_cancels_interviews_without_rejecting_applications` | Current cancelled appointment detail and reason | Flutter historical detail access |
-| CAMP-44 | No scheduled reminder mechanism or dedicated test located | Automated reminders are unverified in backend | Story describes later-release notifications; confirm scope or implement and verify separately |
+| CAMP-37 | Deferred. No complete acceptance evidence claimed. | Advanced manual schedule adjustment | Explicitly deferred |
+| CAMP-38 | Deferred. No complete acceptance evidence claimed. | Editing published interviews with two-hour notice | Explicitly deferred |
+| CAMP-39 | Deferred. No complete acceptance evidence claimed. | Student rescheduling requests | Explicitly deferred |
+| CAMP-40 | Deferred. Cancellation audit tests do not establish full attendance correction and audit history. | Attendance correction and complete audit history | Explicitly deferred |
+| CAMP-41 | Deferred. No complete acceptance evidence claimed. | Second chance after no-show | Explicitly deferred |
+| CAMP-42 | Deferred. No complete acceptance evidence claimed. | Automatic rejection and restoration policy | Explicitly deferred |
+| CAMP-43 | Deferred. Archived cancelled detail coverage does not establish full detailed interview history. | Full interview history | Explicitly deferred |
+| CAMP-44 | Deferred. No scheduled reminder mechanism or complete acceptance evidence located. | Automated interview reminders | Explicitly deferred |
+| CAMP-46 | `test_user_postgresql.py::test_registration_creates_only_student_without_returning_secrets`; `test_login_me_and_logout_revoke_session`; `test_account_management.py::test_private_profile_and_password_change` | Student registration, shared login, own profile and credential update | Flutter registration/login/profile and secure session acceptance |
+| CAMP-47 | `test_user_postgresql.py::test_login_me_and_logout_revoke_session`, `test_disabled_account_cannot_login`, `test_disabling_account_invalidates_existing_session` | Login, logout and session invalidation | Flutter secure persistence and restart acceptance |
+| CAMP-48 | `test_user_postgresql.py::test_postgresql_defaults_and_profile_updates`; `test_private_profile_and_password_change` | Profile reads and permitted edits | Flutter profile screen and validation |
+| CAMP-49 | `test_user_postgresql.py::test_student_affairs_can_use_same_login_without_self_registration`; `test_provision_student_affairs.py::*` | Student Affairs uses shared login and controlled provisioning | Flutter Affairs sign-in route and dashboard |
+| CAMP-50 | `test_user_postgresql.py::test_protected_endpoints_reject_missing_or_invalid_tokens`, `test_expired_and_unregistered_tokens_cannot_access_me`, `test_student_role_cannot_be_overridden_by_client` | Authenticated role checks and forged/missing token rejection | Flutter unauthorized and expired-session UX |
+| CAMP-51 | `test_user_postgresql.py::test_postgresql_rejects_duplicate_normalized_identifiers`, `test_registration_rejects_duplicates_atomically` | Normalized unique identifiers and duplicate registration rejection | Flutter field errors |
+| CAMP-52 | `test_user_postgresql.py::test_disabled_account_cannot_login`, `test_disabling_account_invalidates_existing_session`; `test_account_management.py::test_private_profile_and_password_change` | Account/profile security and session invalidation | Flutter account settings behavior |
+| CAMP-53 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
+| CAMP-54 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
+| CAMP-55 | Deferred. No complete acceptance evidence claimed. | Advanced interview policy | Explicitly deferred |
+| CAMP-56 | `test_event_creation.py::test_archive_cancels_bookings_notices_admin_and_reactivation_keeps_cancellations`; `test_portal_access.py::test_archived_club_remains_visible_read_only_to_its_original_admin` | Archive status, reason and read-only archived access | Flutter archived status and reason display |
+| Club Head workflow | `test_club_head.py::test_club_head_race_rejection_reopening_and_assignment`; `test_student_affairs_singleton_includes_inactive_accounts` | One pending request/head per club, rejection reopening, approval assignment and database singleton | Flutter vacancy/application/review workflow |
+
+CAMP-37–44 and CAMP-53–55 are explicitly deferred. Their partial or adjacent regression coverage is not acceptance evidence for those Stories.
 
 The database-backed suite verifies the backend transitions. Android acceptance still needs a demo against the configured backend, especially the promoted-student refresh, calendar status synchronization and interview history screen. The existing endpoint returns reservation details through `GET /api/v1/me/reservations`; no separate backend calendar endpoint was found.
 
@@ -53,16 +67,28 @@ The database-backed suite verifies the backend transitions. Android acceptance s
 
 Use a dedicated local database name and database role, separate from `campusconnect_db` and any production URL. Set the connection string only in ignored `backend/.env`. Use an operator-selected strong password and URL-encode reserved characters.
 
-From the repository root in PowerShell:
+From the repository root in PowerShell, create `.env` from the example only when it is absent. This preserves any existing development configuration:
 
 ```powershell
 cd backend
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Edit `backend/.env` to point to an empty demo database on the local PostgreSQL instance. Initialize it and check the schema:
+For a clean demo setup, create a dedicated local PostgreSQL role and empty database using a password entered interactively. Do not reuse the development or production database role. Example with `psql` available on `PATH`:
 
-Use `createdb campusconnect_demo` with the local PostgreSQL client on `PATH`. If a dedicated demo role is available, create the database owned by that role. Then set `DATABASE_URL` in `.env` to `campusconnect_demo` and run:
+```powershell
+psql -h localhost -U postgres -d postgres
+```
+
+At the `psql` prompt, run `CREATE ROLE campusconnect_demo LOGIN;`, then `\password campusconnect_demo` and enter a unique demo password, followed by `CREATE DATABASE campusconnect_demo OWNER campusconnect_demo;` and `\q`. Set `DATABASE_URL` in `backend/.env` to the local `campusconnect_demo` URL using the URL-encoded demo password. Keep the `.env` file local and ignored.
+
+Before any schema or account writes, print and verify the exact configured target. This extra confirmation applies before Alembic as well as before secure account provisioning:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from app.config import get_database_url; print(get_database_url().render_as_string(hide_password=True))"
+```
+
+Run from the `backend` directory. Compare the printed host, port and database with the intended local demo target. Stop if they differ. Then initialize the empty demo database and verify its migration head:
 
 ```powershell
 .\.venv\Scripts\python.exe -m alembic upgrade head
@@ -72,7 +98,9 @@ Use `createdb campusconnect_demo` with the local PostgreSQL client on `PATH`. If
 
 The provisioning command prints the database target and asks for exact confirmation. Enter the officer’s name, university email and ID, then enter the password at the hidden prompt. It refuses to create a second Student Affairs account. Keep the password in the operator’s password manager.
 
-Register demo students through `POST /api/v1/auth/register` or the app. Use one student to submit a club request. Sign in as Student Affairs and approve it. The creator is granted administration for that club. Create a second student for RSVP demonstrations. As the Club Admin, create and submit a future event. As Student Affairs, approve it. Set capacity to one. Student A reserves the seat and Student B joins the waitlist. Student A cancels, then Student B refreshes `GET /api/v1/me/reservations` and sees confirmed status.
+Register realistic demo students with university email addresses and unique university IDs through the app or `POST /api/v1/auth/register`. Use a student to request a named club such as Robotics Society. Sign in as Student Affairs and approve it. The creator receives scoped Club Admin access. To demonstrate Club Head approval, use another student to apply to that active club, then approve the request as Student Affairs. Create a second club request/student pair if the demo needs to show rejection and vacancy reopening.
+
+As the Robotics Society Club Admin, create and submit a future event with seat capacity one. Use a clear title such as `Robotics Showcase — FIFO Demo`. Student Affairs approves it. Student A reserves the seat and Student B joins the waitlist. Student A cancels. Student B refreshes the app and sees the reservation promoted to confirmed. Confirm reservation details and state through `GET /api/v1/me/reservations` for each student's own login.
 
 Start the API from `backend` with `.env` pointing at the demo database:
 
@@ -80,4 +108,6 @@ Start the API from `backend` with `.env` pointing at the demo database:
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Check `http://127.0.0.1:8000/health` and `http://127.0.0.1:8000/api/v1/health/db`. For a device on the same network, configure the app with the computer’s LAN address and allow inbound TCP 8000 only on the private network profile. Use the same local demo database throughout rehearsal. Never point the demo build at production or use production credentials.
+Keep the backend bound to localhost. For the Android emulator, configure the app's API base URL as `http://10.0.2.2:8000`. Check `http://127.0.0.1:8000/health` and `http://127.0.0.1:8000/api/v1/health/db` from the host. No LAN firewall rule is needed for the emulator's host loopback mapping.
+
+Final demo order: start PostgreSQL if needed, confirm `DATABASE_URL` still names `campusconnect_demo`, start the API with the command above, check both health URLs, launch the Android app manually, sign in as the provisioned Affairs account, approve the club and event, then sign in as Club Admin and the two students to demonstrate Head approval and FIFO promotion. Do not start or rebuild the emulator as part of backend initialization. Never point this rehearsal at `campusconnect_db` or production, and do not use production credentials.
