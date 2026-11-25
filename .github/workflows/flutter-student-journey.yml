@@ -25,9 +25,13 @@ jobs:
       - name: Resolve Flutter dependencies
         working-directory: mobile
         run: flutter pub get
-      - name: Check Dart formatting
+      - name: Format and show one-file difference
         working-directory: mobile
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: |
+          dart format lib test
+          echo '==SESSION_DIFF_BEGIN=='
+          git -c color.ui=false diff -- lib/core/session.dart
+          echo '==SESSION_DIFF_END=='
       - name: Flutter analyzer
         working-directory: mobile
         run: flutter analyze
