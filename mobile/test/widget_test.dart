@@ -22,9 +22,15 @@ class _MemoryStore implements TokenStore {
 }
 
 class _MockTransport implements ApiTransport {
-  _MockTransport({this.empty = false, this.browseFails = false});
+  _MockTransport({
+    this.empty = false,
+    this.browseFails = false,
+    this.multiPage = false,
+  });
   final bool empty;
   final bool browseFails;
+  final bool multiPage;
+  final browseQueries = <Map<String, String>>[];
   final List<String> paths = [];
 
   @override
@@ -63,6 +69,33 @@ class _MockTransport implements ApiTransport {
     }
     if (uri.path.endsWith('/logout')) return const ApiReply(204, '');
     if (uri.path == '/api/v1/clubs') {
+      final query = uri.queryParameters;
+      browseQueries.add(query);
+      if (multiPage) {
+        final page = int.parse(query['page']!);
+        final filtered =
+            query['search'] == 'Music' && query['category'] == 'Arts';
+        final names = filtered
+            ? ['Music Society', 'Music Workshop']
+            : ['Mock Campus Engineering Club', 'Music Society'];
+        return ApiReply(
+          200,
+          jsonEncode({
+            'clubs': [
+              {
+                'id': names[page - 1],
+                'name': names[page - 1],
+                'description': 'Backend result',
+                'category': filtered || page == 2 ? 'Arts' : 'Academic',
+                'logo_url': null,
+              },
+            ],
+            'page': page,
+            'page_size': 20,
+            'total': 2,
+          }),
+        );
+      }
       if (browseFails) {
         return const ApiReply(503, '{"detail":"Database unavailable"}');
       }
@@ -214,32 +247,46 @@ void main() {
   });
 
   testWidgets(
-    'local search filters loaded clubs without claiming server-wide results',
+    'server search finds clubs beyond the loaded page and keeps filters on pagination',
     (tester) async {
-      final backend = _MockTransport();
+      final backend = _MockTransport(multiPage: true);
       await tester.pumpWidget(_app(backend, _MemoryStore()));
       await tester.pumpAndSettle();
       await _login(tester);
-      final requestCount = backend.paths.length;
-
       expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
-      expect(find.byKey(const ValueKey('club-search')), findsOneWidget);
-
+      expect(find.text('Music Society'), findsNothing);
       await tester.enterText(
         find.byKey(const ValueKey('club-search')),
-        'unlisted music club',
+        'Music',
       );
+      await tester.enterText(
+        find.byKey(const ValueKey('club-category-filter')),
+        'Arts',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
-      expect(
-        find.text('No matching clubs among the loaded results.'),
-        findsOneWidget,
-      );
+      expect(backend.browseQueries.last, {
+        'page': '1',
+        'page_size': '20',
+        'search': 'Music',
+        'category': 'Arts',
+      });
+      expect(find.text('Music Society'), findsOneWidget);
       expect(find.text('Mock Campus Engineering Club'), findsNothing);
 
-      await tester.tap(find.text('Clear filters'));
+      await tester.tap(find.byKey(const ValueKey('load-more-clubs')));
       await tester.pumpAndSettle();
-      expect(find.text('Mock Campus Engineering Club'), findsOneWidget);
-      expect(backend.paths.length, requestCount);
+      expect(backend.browseQueries.last, {
+        'page': '2',
+        'page_size': '20',
+        'search': 'Music',
+        'category': 'Arts',
+      });
+      expect(find.text('Music Workshop'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('club-search')), '');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(backend.browseQueries.last['page'], '1');
     },
   );
 
