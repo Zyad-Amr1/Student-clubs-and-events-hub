@@ -236,16 +236,16 @@ class ManagedEvent {
   final bool isPublished;
 
   factory ManagedEvent.fromJson(JsonObject json) => ManagedEvent(
-        id: json['id'] as String,
-        clubId: json['club_id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String,
-        venue: json['venue'] as String,
-        startsAt: DateTime.parse(json['starts_at'] as String),
-        seatCapacity: json['seat_capacity'] as int,
-        approvalStatus: json['approval_status'] as String,
-        isPublished: json['is_published'] as bool,
-      );
+    id: json['id'] as String,
+    clubId: json['club_id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    venue: json['venue'] as String,
+    startsAt: DateTime.parse(json['starts_at'] as String),
+    seatCapacity: json['seat_capacity'] as int,
+    approvalStatus: json['approval_status'] as String,
+    isPublished: json['is_published'] as bool,
+  );
 }
 
 class PendingReviewPage {
@@ -255,11 +255,11 @@ class PendingReviewPage {
   final int total;
 
   factory PendingReviewPage.fromJson(JsonObject json) => PendingReviewPage(
-        events: (json['events'] as List<dynamic>)
-            .map((entry) => ManagedEvent.fromJson(entry as JsonObject))
-            .toList(),
-        total: json['total'] as int,
-      );
+    events: (json['events'] as List<dynamic>)
+        .map((entry) => ManagedEvent.fromJson(entry as JsonObject))
+        .toList(),
+    total: json['total'] as int,
+  );
 }
 
 class CampusApi {

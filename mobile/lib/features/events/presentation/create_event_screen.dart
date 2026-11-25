@@ -47,7 +47,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
     if (!mounted || time == null) return;
     setState(() {
-      _startsAt = DateTime(day.year, day.month, day.day, time.hour, time.minute);
+      _startsAt = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        time.hour,
+        time.minute,
+      );
       _error = null;
     });
   }
@@ -72,16 +78,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     });
     try {
       final session = StudentSessionScope.of(context);
-      final created = await session.authenticated((token) =>
-          session.api.createDraftEvent(
-            token: token,
-            clubId: widget.club.id,
-            title: _title.text,
-            description: _description.text,
-            venue: _venue.text,
-            startsAt: _startsAt!,
-            seatCapacity: capacity,
-          ));
+      final created = await session.authenticated(
+        (token) => session.api.createDraftEvent(
+          token: token,
+          clubId: widget.club.id,
+          title: _title.text,
+          description: _description.text,
+          venue: _venue.text,
+          startsAt: _startsAt!,
+          seatCapacity: capacity,
+        ),
+      );
       if (mounted) setState(() => _draft = created);
     } on ApiFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -102,7 +109,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     try {
       final session = StudentSessionScope.of(context);
       final submitted = await session.authenticated(
-        (token) => session.api.submitDraftEvent(token, widget.club.id, draft.id),
+        (token) =>
+            session.api.submitDraftEvent(token, widget.club.id, draft.id),
       );
       if (mounted) setState(() => _draft = submitted);
     } on ApiFailure catch (error) {
@@ -124,10 +132,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             if (current == null) ...[
-              Text('Create a draft for ${widget.club.name}',
-                  style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Create a draft for ${widget.club.name}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 8),
-              const Text('Drafts are unpublished until Student Affairs approval.'),
+              const Text(
+                'Drafts are unpublished until Student Affairs approval.',
+              ),
               const SizedBox(height: 18),
               Form(
                 key: _formKey,
@@ -138,7 +150,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       controller: _title,
                       validator: _required,
                       maxLength: 160,
-                      decoration: const InputDecoration(labelText: 'Event title'),
+                      decoration: const InputDecoration(
+                        labelText: 'Event title',
+                      ),
                     ),
                     TextFormField(
                       key: const ValueKey('draft-description'),
@@ -146,7 +160,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       validator: _required,
                       maxLength: 10000,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Description'),
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                      ),
                     ),
                     TextFormField(
                       key: const ValueKey('draft-venue'),
@@ -159,7 +175,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       key: const ValueKey('draft-capacity'),
                       controller: _capacity,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Seat capacity'),
+                      decoration: const InputDecoration(
+                        labelText: 'Seat capacity',
+                      ),
                     ),
                   ],
                 ),
@@ -169,9 +187,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 key: const ValueKey('pick-start-date'),
                 onPressed: _busy ? null : _chooseStart,
                 icon: const Icon(Icons.event_outlined),
-                label: Text(_startsAt == null
-                    ? 'Select start date and time'
-                    : 'Starts: ${_startsAt!.toLocal()}'),
+                label: Text(
+                  _startsAt == null
+                      ? 'Select start date and time'
+                      : 'Starts: ${_startsAt!.toLocal()}',
+                ),
               ),
               const SizedBox(height: 18),
               FilledButton.icon(
@@ -181,10 +201,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 label: const Text('Create draft'),
               ),
             ] else ...[
-              Text(current.title, style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                current.title,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 8),
-              Text('Status: ${current.approvalStatus}',
-                  key: const ValueKey('draft-status')),
+              Text(
+                'Status: ${current.approvalStatus}',
+                key: const ValueKey('draft-status'),
+              ),
               Text('Published: ${current.isPublished ? 'Yes' : 'No'}'),
               Text('Venue: ${current.venue}'),
               Text('Starts: ${current.startsAt.toLocal()}'),
@@ -201,19 +226,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               const SizedBox(height: 12),
               OutlinedButton(
                 key: const ValueKey('new-draft'),
-                onPressed: _busy ? null : () => setState(() {
-                  _draft = null;
-                  _startsAt = null;
-                  _formKey.currentState?.reset();
-                }),
+                onPressed: _busy
+                    ? null
+                    : () => setState(() {
+                        _draft = null;
+                        _startsAt = null;
+                        _formKey.currentState?.reset();
+                      }),
                 child: const Text('Create another draft'),
               ),
             ],
             if (_busy) const Center(child: CircularProgressIndicator()),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, key: const ValueKey('event-error'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                key: const ValueKey('event-error'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ],
         ),
