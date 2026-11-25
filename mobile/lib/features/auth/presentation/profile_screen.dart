@@ -1,3 +1,4 @@
+import 'package:campusconnect/features/clubs/presentation/club_head_screen.dart';
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
@@ -180,6 +181,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const MembershipScreen(),
+                  ),
+                ),
+              ),
+              ListTile(
+                title: const Text('My Club Head Requests'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ClubHeadScreen(),
                   ),
                 ),
               ),

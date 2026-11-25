@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 part 'membership_api.dart';
+part 'club_head_api.dart';
 part 'interview_api.dart';
 
 typedef JsonObject = Map<String, dynamic>;

@@ -206,8 +206,26 @@ def test_archiving_club_cancels_interviews_without_rejecting_applications(
     assert calendar[0]["cancellation_reason"] == "Building closed"
     app_state = client.get("/api/v1/me/applications", headers=student).json()["applications"][0]
     assert app_state["status"] == "interview_required"
+    details = client.get(application_path, headers=student)
+    assert details.status_code == 200, details.text
+    assert details.json()["days"] == []
+    booking = details.json()["booking"]
+    assert booking["day_id"] == day and booking["day"] == date.isoformat()
+    assert booking["status"] == "cancelled" and booking["cancellation_reason"] == "Building closed"
+    for field in ("starts_at", "ends_at"):
+        assert datetime.fromisoformat(booking[field]) == datetime.fromisoformat(appointments[0][field])
+    assert client.get(application_path, headers=owner).status_code == 404
+    assert client.get(application_path, headers=scenario["headers"]["affairs"]).status_code == 403
+    assert choose(client, application_path, student, day).status_code == 404
+    assert client.delete(application_path, headers=student).status_code == 404
     attendance = client.put(
         f"{day_path}/appointments/{appointments[0]['selection_id']}/attendance",
         headers=owner, json={"status": "no_show"},
     )
     assert attendance.status_code == 404
+
+    reactivated = client.post(club_path + "/reactivate", headers=scenario["headers"]["affairs"], json={})
+    assert reactivated.status_code == 200, reactivated.text
+    assert client.get(application_path, headers=student).json() == details.json()
+    assert choose(client, application_path, student, day).status_code == 409
+    assert client.get("/api/v1/me/interview-appointments", headers=student).json()["appointments"] == calendar

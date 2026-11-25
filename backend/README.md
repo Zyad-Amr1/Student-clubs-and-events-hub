@@ -294,7 +294,7 @@ and refuses password entry when echo cannot be suppressed. It validates the
 same fields as registration, hashes with scrypt, and creates a new Student
 Affairs account. An existing email or University ID is rejected without
 changing the existing account. Public registration continues to create only
-Students. CAMP-63 provisioning uses the existing schema and adds no migration.
+Students. Migration `0013_club_head_requests` enforces the Student Affairs singleton.
 
 ## Club browsing API
 
@@ -564,3 +564,29 @@ refuses to discard recorded cancellation, expiry or attendance history.
 
 CAMP-56 archive status and archive reasons depend on the separate club
 lifecycle work. The current admin routes require an approved, active club.
+
+
+## Club Head applications and Student Affairs singleton
+
+Apply migration `0013_club_head_requests` before deploying this version. It
+rejects upgrades with more than one Student Affairs account so an operator can
+resolve the existing accounts deliberately. PostgreSQL permits one account of
+that type, including inactive accounts. Use the existing interactive command
+`python -m app.auth.provision_student_affairs` once per database, and keep the
+chosen fixed credentials in the project lead's password manager. The password
+prompt does not echo and only the password hash is stored. Sign in through the
+same Flutter sign-in screen as Students.
+
+- `GET /api/v1/clubs/{club_id}/head-vacancy` returns `open`, `locked`, or
+  `assigned` for an active, approved club.
+- `POST /api/v1/clubs/{club_id}/head-requests` submits the caller's application.
+  The club row serializes applications and assignment and PostgreSQL enforces
+  one pending application and one administrator grant per club. Database triggers
+  also prevent a pending request and an active grant from coexisting.
+- `GET /api/v1/me/club-head-requests` returns the current Student's history.
+- `GET /api/v1/student-affairs/club-head-requests` lists pending requests.
+- `POST /api/v1/student-affairs/club-head-requests/{id}/decision` accepts an
+  approval or a rejection with a visible reason. Approval adds the normal
+  club-scoped administrator grant and preserves the Student account. Rejection
+  preserves the request and reopens applications when the club is active and
+  no Head is assigned.

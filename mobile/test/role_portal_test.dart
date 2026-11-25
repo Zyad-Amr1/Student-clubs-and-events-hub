@@ -80,7 +80,8 @@ class PortalTransport implements ApiTransport {
         }),
       );
     }
-    if (uri.path == '/api/v1/auth/club-admin/clubs') {
+    if (uri.path == '/api/v1/auth/club-admin/clubs' ||
+        uri.path == '/api/v1/auth/me/managed-clubs') {
       return allowClub
           ? const ApiReply(
               200,
@@ -123,6 +124,12 @@ class PortalTransport implements ApiTransport {
       return const ApiReply(
         200,
         '{"status":"archived","archive_reason":"Campus closure"}',
+      );
+    }
+    if (uri.path == '/api/v1/clubs') {
+      return const ApiReply(
+        200,
+        '{"clubs":[],"page":1,"page_size":20,"total":0}',
       );
     }
     if (uri.path == '/api/v1/auth/logout') {
@@ -263,39 +270,33 @@ void main() {
     session.dispose();
   });
 
-  testWidgets('three portal choices route to separate secure login screens', (
+  testWidgets('Welcome offers shared sign-in and student registration', (
     tester,
   ) async {
-    final backend = PortalTransport();
     await tester.pumpWidget(
       CampusConnectApp(
-        api: portalApi(backend),
+        api: portalApi(PortalTransport()),
         tokenStore: PortalMemoryStore(),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('open-auth')), findsOneWidget);
-    expect(find.byKey(const ValueKey('open-club-admin-auth')), findsOneWidget);
+    expect(find.byKey(const ValueKey('open-club-admin-auth')), findsNothing);
     expect(
       find.byKey(const ValueKey('open-student-affairs-auth')),
-      findsOneWidget,
+      findsNothing,
     );
-
-    await tester.tap(find.byKey(const ValueKey('open-club-admin-auth')));
+    await tester.tap(find.byKey(const ValueKey('open-auth')));
     await tester.pumpAndSettle();
-    expect(find.text('Club administrator login'), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-toggle')), findsNothing);
+    expect(find.text('Welcome back'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('open-student-affairs-auth')));
+    await tester.tap(find.byKey(const ValueKey('open-registration')));
     await tester.pumpAndSettle();
-    expect(find.text('Student Affairs login'), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-toggle')), findsNothing);
+    expect(find.byKey(const ValueKey('register-name')), findsOneWidget);
   });
 
   testWidgets(
-    'Club Admin login displays server-owned memberships and signs out',
+    'Club Head switches from the shared login to verified club management',
     (tester) async {
       final backend = PortalTransport();
       final store = PortalMemoryStore();
@@ -303,7 +304,7 @@ void main() {
         CampusConnectApp(api: portalApi(backend), tokenStore: store),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('open-club-admin-auth')));
+      await tester.tap(find.byKey(const ValueKey('open-auth')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('auth-email')),
@@ -316,6 +317,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('auth-submit')));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage My Club'));
+      await tester.pumpAndSettle();
       expect(find.text('Club Admin portal'), findsOneWidget);
       expect(find.text('Verified Robotics Club'), findsOneWidget);
       expect(store.portal, 'clubAdmin');
@@ -340,7 +345,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('open-student-affairs-auth')));
+    await tester.tap(find.byKey(const ValueKey('open-auth')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('auth-email')),
@@ -368,7 +373,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('open-student-affairs-auth')));
+    await tester.tap(find.byKey(const ValueKey('open-auth')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('auth-email')),

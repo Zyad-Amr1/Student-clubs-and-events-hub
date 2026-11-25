@@ -152,7 +152,7 @@ class StudentSession extends ChangeNotifier {
   Future<void> signIn(
     String email,
     String password, {
-    PortalRole portal = PortalRole.student,
+    PortalRole? portal,
   }) async {
     _busy = true;
     notifyListeners();
@@ -160,14 +160,19 @@ class StudentSession extends ChangeNotifier {
     try {
       token = await api.login(email.trim(), password);
       final user = await api.profile(token);
-      final clubs = await _verifyPortal(token, user, portal);
+      final destination =
+          portal ??
+          (user.accountType == 'student_affairs'
+              ? PortalRole.studentAffairs
+              : PortalRole.student);
+      final clubs = await _verifyPortal(token, user, destination);
       await store.write(token);
       if (store is PortalPreferenceStore) {
-        await (store as PortalPreferenceStore).writePortal(portal.name);
+        await (store as PortalPreferenceStore).writePortal(destination.name);
       }
       _token = token;
       _profile = user;
-      _portal = portal;
+      _portal = destination;
       _managedClubs = clubs;
     } catch (_) {
       try {

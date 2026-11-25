@@ -62,7 +62,7 @@ def _activities(db: Session, club: Club, now: datetime):
         InterviewDay.club_id == club.id, InterviewDay.day >= now.date(),
         InterviewDay.cancelled_at.is_(None),
     ).order_by(InterviewDay.day, InterviewDay.id)).all()
-    reservations = db.execute(select(EventReservation, User.full_name).join(
+    reservations = db.execute(select(EventReservation, User.full_name, Event).join(
         User, User.id == EventReservation.user_id,
     ).join(Event, Event.id == EventReservation.event_id).where(
         Event.club_id == club.id, Event.starts_at > now,
@@ -79,7 +79,7 @@ def _activities(db: Session, club: Club, now: datetime):
       .order_by(InterviewDay.day, InterviewSelection.selected_at, InterviewSelection.id)).all()
     snapshot = {
         "events": [(str(event.id), event.starts_at.isoformat()) for event in events],
-        "reservations": [(row.id, row.status, name) for row, name in reservations],
+        "reservations": [(row.id, row.status, name) for row, name, _ in reservations],
         "days": [(str(day.id), day.day.isoformat()) for day in days],
         "interviews": [(str(row.id), str(student_id), name) for row, student_id, name, _ in interviews],
     }
@@ -120,13 +120,12 @@ def archive_preview(club_id: UUID, identity: Affairs, db: DB):
     events, days, reservations, interviews, snapshot = _activities(db, club, utcnow())
     return {"preview_token": _preview_token(club, snapshot),
             "events": [{"id": event.id, "title": event.title, "starts_at": event.starts_at,
-                        "students": sum(1 for row, _ in reservations if row.event_id == event.id
-                                        and row.status in ("confirmed", "waitlisted"))}
+                        "students": sum(1 for row, _, _ in reservations if row.event_id == event.id)}
                        for event in events],
             "interview_days": [{"id": day.id, "day": day.day,
                                 "students": sum(1 for _, _, _, item_day in interviews if item_day.id == day.id)}
                                for day in days],
-            "affected_students": sorted({name for _, name in reservations} |
+            "affected_students": sorted({name for _, name, _ in reservations} |
                                          {name for _, _, name, _ in interviews})}
 
 
@@ -156,11 +155,11 @@ def archive_club(club_id: UUID, data: ArchiveCommand, identity: Affairs, db: DB)
                 f"{club.name} was archived: {data.reason}")
     for event in events:
         event.cancelled_at, event.cancellation_reason, event.is_published = now, data.reason, False
-    for reservation, _ in reservations:
-        if reservation.status in ("confirmed", "waitlisted"):
-            reservation.status = "cancelled"
-            _notice(db, club, reservation.user_id, f"archive:{audit.id}:reservation:{reservation.id}",
-                    "activity_cancelled", f"{club.name} cancelled {next(e.title for e in events if e.id == reservation.event_id)}: {data.reason}")
+    for reservation, _, event in reservations:
+        reservation.status = "cancelled"
+        reason = event.cancellation_reason or data.reason
+        _notice(db, club, reservation.user_id, f"archive:{audit.id}:reservation:{reservation.id}",
+                "activity_cancelled", f"{club.name} cancelled {event.title}: {reason}")
 
     for day in days:
         day_audit = InterviewCancellation(day_id=day.id, actor_id=identity.user.id,

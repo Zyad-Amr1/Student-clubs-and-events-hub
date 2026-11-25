@@ -1,3 +1,4 @@
+import 'package:campusconnect/features/clubs/presentation/club_head_screen.dart';
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
@@ -153,6 +154,15 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                             ? 'Application on file'
                             : 'Apply to join',
                       ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ClubHeadScreen(club: club),
+                        ),
+                      ),
+                      icon: const Icon(Icons.badge_outlined),
+                      label: const Text('Club Head vacancy'),
                     ),
                     const SizedBox(height: 26),
                     Text(
