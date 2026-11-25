@@ -9,6 +9,7 @@ from sqlalchemy import (
     Enum,
     FetchedValue,
     Integer,
+    Index,
     Text,
     UniqueConstraint,
     Uuid,
@@ -36,6 +37,8 @@ class AccountType(StrEnum):
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
+        Index("uq_users_student_affairs", "account_type", unique=True,
+              postgresql_where=text("account_type = 'student_affairs'")),
         UniqueConstraint("email", name="uq_users_email"),
         UniqueConstraint("university_id", name="uq_users_university_id"),
         CheckConstraint(

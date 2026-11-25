@@ -56,7 +56,7 @@ def _confirm_target_database() -> bool:
 
 
 def _student_affairs_exists(db: Session) -> bool:
-    """Operational singleton guard, not a concurrent database constraint."""
+    """Give operators a clear message before the database uniqueness check."""
     return db.scalar(
         select(User.id)
         .where(User.account_type == AccountType.STUDENT_AFFAIRS)
@@ -121,7 +121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         with Session(get_engine()) as db:
             _lock_student_affairs_provisioning(db)
             # Check the operational singleton before insertion, after the
-            # existing input validation. Not a DB-wide concurrent singleton.
+            # existing input validation. PostgreSQL also enforces uniqueness.
             if _student_affairs_exists(db):
                 _refuse_second_account()
                 return 1

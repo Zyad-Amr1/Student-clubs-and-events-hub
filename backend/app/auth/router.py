@@ -23,6 +23,7 @@ from app.models.auth_session import AuthSession
 from app.models.user import AccountType, User
 from app.models.club import Club, ClubApprovalStatus
 from app.models.club_administrator import ClubAdministrator
+from app.models.club_head_request import ClubHeadRequest
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -227,6 +228,11 @@ def assign_club_administrator(
         return ClubAdministratorAssignmentResponse(
             club_id=club.id, user_id=candidate.id
         )
+
+    if db.scalar(select(ClubHeadRequest.id).where(
+        ClubHeadRequest.club_id == club.id, ClubHeadRequest.status == "pending",
+    )) is not None:
+        raise HTTPException(409, "Review the pending Club Head application first.")
 
     # DELETE executes before INSERT. The two operations share one transaction;
     # on failure, the previous administrator remains unchanged.

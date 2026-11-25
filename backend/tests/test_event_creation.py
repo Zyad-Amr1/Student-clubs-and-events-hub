@@ -82,6 +82,7 @@ def draft_client(draft_test_engine, monkeypatch):
         else:
             app.dependency_overrides[get_db] = previous
         with draft_test_engine.begin() as connection:
+            connection.execute(text("DELETE FROM club_head_requests"))
             connection.execute(text("DELETE FROM club_lifecycle_notices"))
             connection.execute(text("DELETE FROM club_lifecycle_audits"))
             connection.execute(text("DELETE FROM membership_applications"))
