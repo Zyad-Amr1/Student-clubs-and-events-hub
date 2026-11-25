@@ -92,3 +92,15 @@ class AuthenticatedUser(BaseModel):
     account_type: Literal["student", "student_affairs"]
     is_active: bool
     created_at: datetime
+
+
+class ManagedClub(BaseModel):
+    """Only the identifiers needed for a club administrator landing page."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    name: str
+
+
+class ManagedClubsResponse(BaseModel):
+    clubs: list[ManagedClub]
