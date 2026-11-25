@@ -202,6 +202,18 @@ class ClubDetails {
   );
 }
 
+class ManagedClub {
+  const ManagedClub({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  factory ManagedClub.fromJson(JsonObject json) => ManagedClub(
+        id: json['id'] as String,
+        name: json['name'] as String,
+      );
+}
+
 class CampusApi {
   CampusApi({ApiTransport? transport, Uri? baseUri})
     : _transport = transport ?? IoApiTransport(),
@@ -314,6 +326,32 @@ class CampusApi {
   Future<StudentProfile> profile(String token) async => StudentProfile.fromJson(
     await _request('GET', '/api/v1/auth/me', token: token),
   );
+
+  Future<List<ManagedClub>> managedClubs(String token) async {
+    final json = await _request(
+      'GET',
+      '/api/v1/auth/club-admin/clubs',
+      token: token,
+    );
+    final clubs = json['clubs'];
+    if (clubs is! List) {
+      throw const ApiFailure('Invalid club permission response.');
+    }
+    return clubs
+        .map((item) => ManagedClub.fromJson(item as JsonObject))
+        .toList();
+  }
+
+  Future<void> verifyStudentAffairs(String token) async {
+    final response = await _request(
+      'GET',
+      '/api/v1/auth/student-affairs',
+      token: token,
+    );
+    if (response['account_type'] != 'student_affairs') {
+      throw const ApiFailure('Insufficient permissions.', statusCode: 403);
+    }
+  }
 
   Future<void> logout(String token) async {
     await _request('POST', '/api/v1/auth/logout', token: token);

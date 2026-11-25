@@ -27,6 +27,16 @@ class MainActivity : FlutterActivity() {
                 try {
                     when (call.method) {
                         "read" -> result.success(readToken())
+                        "readPortal" -> result.success(preferences.getString("portal", null))
+                        "writePortal" -> {
+                            val portal = call.argument<String>("portal")
+                            if (portal !in setOf("student", "clubAdmin", "studentAffairs")) {
+                                result.error("INVALID_PORTAL", "Invalid portal", null)
+                            } else {
+                                preferences.edit().putString("portal", portal).apply()
+                                result.success(null)
+                            }
+                        }
                         "write" -> {
                             val token = call.argument<String>("token")
                             if (token.isNullOrEmpty()) {
@@ -37,7 +47,7 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                         "delete" -> {
-                            preferences.edit().remove("blob").apply()
+                            preferences.edit().remove("blob").remove("portal").apply()
                             result.success(null)
                         }
                         else -> result.notImplemented()

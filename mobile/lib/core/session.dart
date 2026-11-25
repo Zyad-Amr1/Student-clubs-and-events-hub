@@ -2,12 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'api_client.dart';
+import 'portal_role.dart';
 
 /// On Android, token bytes are encrypted by Android Keystore before persistence.
 abstract class TokenStore {
   Future<String?> read();
   Future<void> write(String token);
   Future<void> clear();
+
+  // A stored portal is an untrusted UI preference, rechecked against FastAPI.
+  Future<String?> readPortal() async => null;
+  Future<void> writePortal(String portal) async {}
 }
 
 class AndroidKeystoreTokenStore implements TokenStore {
@@ -16,6 +21,14 @@ class AndroidKeystoreTokenStore implements TokenStore {
   static const MethodChannel _channel = MethodChannel(
     'campusconnect/secure_token',
   );
+
+  @override
+  Future<String?> readPortal() => _channel.invokeMethod<String>('readPortal');
+
+  @override
+  Future<void> writePortal(String portal) async {
+    await _channel.invokeMethod<void>('writePortal', {'portal': portal});
+  }
 
   @override
   Future<String?> read() => _channel.invokeMethod<String>('read');
@@ -42,12 +55,45 @@ class StudentSession extends ChangeNotifier {
   bool _ready = false;
   bool _busy = false;
   String? _restoreError;
+  PortalRole _portal = PortalRole.student;
+  List<ManagedClub> _managedClubs = const [];
 
   bool get ready => _ready;
   bool get busy => _busy;
   bool get signedIn => _token != null && _profile != null;
   StudentProfile? get profile => _profile;
+  PortalRole get portal => _portal;
+  List<ManagedClub> get managedClubs => List.unmodifiable(_managedClubs);
   String? get restoreError => _restoreError;
+
+  Future<List<ManagedClub>> _verifyPortal(
+    String token,
+    StudentProfile user,
+    PortalRole portal,
+  ) async {
+    switch (portal) {
+      case PortalRole.student:
+        if (user.accountType != 'student') {
+          throw const ApiFailure('This portal requires a Student account.', statusCode: 403);
+        }
+        return const [];
+      case PortalRole.clubAdmin:
+        if (user.accountType != 'student') {
+          throw const ApiFailure('Club administration requires a Student account.', statusCode: 403);
+        }
+        final assigned = await api.managedClubs(token);
+        if (assigned.isEmpty) {
+          throw const ApiFailure('No club administrator assignment found.', statusCode: 403);
+        }
+        return assigned;
+      case PortalRole.studentAffairs:
+        if (user.accountType != 'student_affairs') {
+          throw const ApiFailure('This portal requires a Student Affairs account.', statusCode: 403);
+        }
+        await api.verifyStudentAffairs(token);
+        return const [];
+    }
+  }
 
   Future<void> restore() async {
     _ready = false;
@@ -58,15 +104,19 @@ class StudentSession extends ChangeNotifier {
       if (saved != null && saved.isNotEmpty) {
         try {
           final user = await api.profile(saved);
-          if (user.accountType == 'student') {
-            _token = saved;
-            _profile = user;
-          } else {
-            await store.clear();
-          }
+          final savedChoice = portalFromStorage(await store.readPortal());
+          final choice = savedChoice ??
+              (user.accountType == 'student_affairs'
+                  ? PortalRole.studentAffairs
+                  : PortalRole.student);
+          final clubs = await _verifyPortal(saved, user, choice);
+          _token = saved;
+          _profile = user;
+          _portal = choice;
+          _managedClubs = clubs;
         } on ApiFailure catch (error) {
           if (error.statusCode == 401 || error.statusCode == 403) {
-            await store.clear();
+            await _dropLocalSession();
           } else {
             _restoreError = error.message;
           }
@@ -80,27 +130,38 @@ class StudentSession extends ChangeNotifier {
     }
   }
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signIn(
+    String email,
+    String password, {
+    PortalRole portal = PortalRole.student,
+  }) async {
     _busy = true;
     notifyListeners();
     String? token;
     try {
       token = await api.login(email.trim(), password);
       final user = await api.profile(token);
-      if (user.accountType != 'student') {
+      final clubs = await _verifyPortal(token, user, portal);
+      await store.write(token);
+      await store.writePortal(portal.name);
+      _token = token;
+      _profile = user;
+      _portal = portal;
+      _managedClubs = clubs;
+    } catch (_) {
+      try {
+        await store.clear();
+      } catch (_) {
+        // Never keep an unauthorized local session even if storage is unavailable.
+      }
+      if (token != null) {
         try {
           await api.logout(token);
         } catch (_) {
-          // Local access is denied even if remote revocation is unavailable.
+          // Local authorization remains denied; remote revocation best effort.
         }
-        throw const ApiFailure(
-          'This app is for Student accounts only.',
-          statusCode: 403,
-        );
       }
-      await store.write(token);
-      _token = token;
-      _profile = user;
+      rethrow;
     } finally {
       _busy = false;
       notifyListeners();
@@ -140,16 +201,28 @@ class StudentSession extends ChangeNotifier {
     try {
       return await call(token);
     } on ApiFailure catch (error) {
-      if (error.statusCode == 401) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
         await _dropLocalSession();
       }
       rethrow;
     }
   }
 
+  Future<void> refreshPortalAccess() async {
+    await authenticated((token) async {
+      final user = await api.profile(token);
+      final clubs = await _verifyPortal(token, user, _portal);
+      _profile = user;
+      _managedClubs = clubs;
+      notifyListeners();
+    });
+  }
+
   Future<void> _dropLocalSession() async {
     _token = null;
     _profile = null;
+    _portal = PortalRole.student;
+    _managedClubs = const [];
     try {
       await store.clear();
     } finally {
