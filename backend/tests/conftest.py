@@ -11,6 +11,7 @@ from sqlalchemy import URL, create_engine, inspect, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.auth.public_limits import clear_for_testing
 from app.main import app
 
 
@@ -101,3 +102,10 @@ def auth_client(registration_client, monkeypatch):
     """Use the shared auth routes and a test-only JWT signing key."""
     monkeypatch.setenv("JWT_SECRET_KEY", "only-for-tests-0123456789-abcdefghijklmnopqrstuv")
     return registration_client
+
+
+@pytest.fixture(autouse=True)
+def isolated_auth_rate_counters():
+    clear_for_testing()
+    yield
+    clear_for_testing()
