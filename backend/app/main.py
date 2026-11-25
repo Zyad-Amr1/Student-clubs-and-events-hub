@@ -5,6 +5,8 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.auth.public_limits import check_public_auth_rate
+
 from app.auth.router import router as auth_router
 from app.clubs.router import router as clubs_router
 from app.events.router import router as events_router
@@ -18,6 +20,14 @@ app = FastAPI(title="CampusConnect API", version="0.1.0")
 app.include_router(auth_router)
 app.include_router(clubs_router)
 app.include_router(events_router)
+
+
+@app.middleware("http")
+async def throttle_public_auth(request: Request, call_next):
+    denied = check_public_auth_rate(request)
+    if denied is not None:
+        return denied
+    return await call_next(request)
 
 
 @app.exception_handler(RequestValidationError)

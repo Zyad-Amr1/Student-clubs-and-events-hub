@@ -6,14 +6,16 @@ from collections.abc import Sequence
 from getpass import GetPassWarning, getpass
 
 from pydantic import ValidationError
+from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.accounts import DuplicateAccountError, create_account
+from app.auth.passwords import PasswordHashCapacityError
 from app.auth.schemas import AccountCreationInput
 from app.config import DatabaseConfigurationError, get_database_url
 from app.database import get_engine
-from app.models.user import AccountType
+from app.models.user import AccountType, User
 
 
 def _confirm_target_database() -> bool:
@@ -51,6 +53,38 @@ def _confirm_target_database() -> bool:
     return True
 
 
+
+
+def _student_affairs_exists(db: Session) -> bool:
+    """Operational singleton guard, not a concurrent database constraint."""
+    return db.scalar(
+        select(User.id)
+        .where(User.account_type == AccountType.STUDENT_AFFAIRS)
+        .limit(1)
+    ) is not None
+
+
+def _refuse_second_account() -> None:
+    print(
+        "A Student Affairs account already exists. "
+        "Provisioning another account was cancelled. "
+        "Contact the authorized university administrator for recovery.",
+        file=sys.stderr,
+    )
+
+
+def _lock_student_affairs_provisioning(db: Session) -> None:
+    """Serialize this trusted CLI across processes on the same PostgreSQL DB.
+
+    The transaction-scoped advisory lock lasts across the existence check and
+    create_account(db,...), which commits and releases it. Never run outside
+    the same Session/transaction or commit before the insert.
+    """
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {"lock_key": 0x43414D5043414646},
+    )
+
 def main(argv: Sequence[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
@@ -85,7 +119,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         with Session(get_engine()) as db:
+            _lock_student_affairs_provisioning(db)
+            # Check the operational singleton before insertion, after the
+            # existing input validation. Not a DB-wide concurrent singleton.
+            if _student_affairs_exists(db):
+                _refuse_second_account()
+                return 1
             create_account(db, data, AccountType.STUDENT_AFFAIRS)
+    except PasswordHashCapacityError:
+        print("Provisioning temporarily busy. Retry securely.", file=sys.stderr)
+        return 1
     except DuplicateAccountError:
         print("An account with these identifiers already exists.", file=sys.stderr)
         return 1
