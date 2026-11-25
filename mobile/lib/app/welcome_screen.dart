@@ -85,18 +85,30 @@ class WelcomeScreen extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pushNamed(AppRoutes.authentication),
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text('Get started'),
+                  label: const Text('Student portal'),
                 ),
               ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  key: const ValueKey<String>('open-clubs'),
+                  key: const ValueKey<String>('open-club-admin-auth'),
                   onPressed: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.authentication),
-                  icon: const Icon(Icons.groups_outlined),
-                  label: const Text('Sign in to explore clubs'),
+                      Navigator.of(context).pushNamed(AppRoutes.clubAdminLogin),
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  label: const Text('Club Admin portal'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey<String>('open-student-affairs-auth'),
+                  onPressed: () =>
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.studentAffairsLogin),
+                  icon: const Icon(Icons.school_outlined),
+                  label: const Text('Student Affairs portal'),
                 ),
               ),
             ],

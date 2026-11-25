@@ -1,9 +1,12 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/core/portal_role.dart';
 import 'package:material_ui/material_ui.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({super.key, this.portal = PortalRole.student});
+
+  final PortalRole portal;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -42,7 +45,7 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     final session = StudentSessionScope.of(context);
     try {
-      if (_register) {
+      if (_register && widget.portal == PortalRole.student) {
         await session.registerAndSignIn(
           fullName: _name.text,
           email: _email.text,
@@ -51,7 +54,11 @@ class _AuthScreenState extends State<AuthScreen> {
           confirmPassword: _confirmation.text,
         );
       } else {
-        await session.signIn(_email.text, _password.text);
+        await session.signIn(
+          _email.text,
+          _password.text,
+          portal: widget.portal,
+        );
       }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -69,7 +76,9 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_register ? 'Create student account' : 'Student login'),
+      title: Text(
+        _register ? 'Create student account' : widget.portal.loginTitle,
+      ),
     ),
     body: SafeArea(
       child: Center(
@@ -87,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 20),
-                  if (_register) ...[
+                  if (_register && widget.portal == PortalRole.student) ...[
                     TextFormField(
                       key: const ValueKey('register-name'),
                       controller: _name,
@@ -124,7 +133,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  if (_register) ...[
+                  if (_register && widget.portal == PortalRole.student) ...[
                     TextFormField(
                       key: const ValueKey('register-university-id'),
                       controller: _universityId,
@@ -154,7 +163,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       return null;
                     },
                   ),
-                  if (_register) ...[
+                  if (_register && widget.portal == PortalRole.student) ...[
                     const SizedBox(height: 12),
                     TextFormField(
                       key: const ValueKey('register-confirm-password'),
@@ -195,21 +204,22 @@ class _AuthScreenState extends State<AuthScreen> {
                         : Text(_register ? 'Register and sign in' : 'Sign in'),
                   ),
                   const SizedBox(height: 10),
-                  TextButton(
-                    key: const ValueKey('auth-toggle'),
-                    onPressed: _submitting
-                        ? null
-                        : () => setState(() {
-                            _register = !_register;
-                            _error = null;
-                            _formKey.currentState?.reset();
-                          }),
-                    child: Text(
-                      _register
-                          ? 'Already have an account? Sign in'
-                          : 'New student? Create an account',
+                  if (widget.portal == PortalRole.student)
+                    TextButton(
+                      key: const ValueKey('auth-toggle'),
+                      onPressed: _submitting
+                          ? null
+                          : () => setState(() {
+                              _register = !_register;
+                              _error = null;
+                              _formKey.currentState?.reset();
+                            }),
+                      child: Text(
+                        _register
+                            ? 'Already have an account? Sign in'
+                            : 'New student? Create an account',
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

@@ -3,9 +3,11 @@ import 'package:campusconnect/app/theme.dart';
 import 'package:campusconnect/app/welcome_screen.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/session.dart';
+import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/auth_screen.dart';
 import 'package:campusconnect/features/auth/presentation/profile_screen.dart';
 import 'package:campusconnect/features/clubs/presentation/clubs_screen.dart';
+import 'package:campusconnect/features/auth/presentation/role_home_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 class StudentSessionScope extends InheritedNotifier<StudentSession> {
@@ -67,6 +69,10 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
     routes: {
       AppRoutes.home: (context) => const _HomeGate(),
       AppRoutes.authentication: (context) => const AuthScreen(),
+      AppRoutes.clubAdminLogin: (context) =>
+          const AuthScreen(portal: PortalRole.clubAdmin),
+      AppRoutes.studentAffairsLogin: (context) =>
+          const AuthScreen(portal: PortalRole.studentAffairs),
       AppRoutes.clubs: (context) => const ClubsScreen(),
       AppRoutes.profile: (context) => const ProfileScreen(),
     },
@@ -103,6 +109,15 @@ class _HomeGate extends StatelessWidget {
         ),
       );
     }
-    return session.signedIn ? const ClubsScreen() : const WelcomeScreen();
+    if (!session.signedIn) return const WelcomeScreen();
+    return switch (session.portal) {
+      PortalRole.student => const ClubsScreen(),
+      PortalRole.clubAdmin => const RoleHomeScreen(
+        portal: PortalRole.clubAdmin,
+      ),
+      PortalRole.studentAffairs => const RoleHomeScreen(
+        portal: PortalRole.studentAffairs,
+      ),
+    };
   }
 }
