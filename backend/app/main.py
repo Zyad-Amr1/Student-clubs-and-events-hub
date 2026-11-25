@@ -10,6 +10,7 @@ from app.auth.public_limits import check_public_auth_rate
 from app.auth.router import router as auth_router
 from app.auth.profile_router import router as profile_router
 from app.clubs.router import router as clubs_router
+from app.clubs.management_router import router as club_management_router
 from app.events.router import router as events_router
 from app.events.reservation_router import router as event_reservation_router
 from app.events.review_router import router as event_review_router
@@ -23,6 +24,7 @@ app = FastAPI(title="CampusConnect API", version="0.1.0")
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(clubs_router)
+app.include_router(club_management_router)
 app.include_router(events_router)
 app.include_router(event_reservation_router)
 app.include_router(event_review_router)
@@ -39,7 +41,13 @@ async def throttle_public_auth(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def sanitize_registration_validation(request: Request, exc: RequestValidationError):
     """Do not echo submitted passwords in FastAPI's 422 validation payload."""
-    if request.url.path not in {
+    path = request.url.path
+    is_club_management = (
+        path.startswith("/api/v1/me/club-requests")
+        or path.startswith("/api/v1/student-affairs/club-requests")
+        or (path.startswith("/api/v1/club-admin/clubs/") and path.endswith("/profile"))
+    )
+    if not is_club_management and path not in {
         "/api/v1/auth/register", "/api/v1/auth/login",
         "/api/v1/auth/me", "/api/v1/auth/me/password",
     }:

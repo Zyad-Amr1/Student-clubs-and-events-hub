@@ -472,3 +472,30 @@ the calling session.
 
 `GET /api/v1/auth/me/managed-clubs` lists the caller's current active,
 approved club assignments (possibly empty) for the Student Profile.
+
+## Club creation requests and club profile edits
+
+- Students use `GET/POST /api/v1/me/club-requests` to list their history and
+  create a request. `PUT /api/v1/me/club-requests/{id}` edits a pending request,
+  and `POST /api/v1/me/club-requests/{id}/withdraw` closes it without deleting it.
+- Student Affairs uses `GET /api/v1/student-affairs/club-requests` for the
+  pending queue and `GET /api/v1/student-affairs/club-requests/{id}/similar`
+  to compare active clubs in the same category. Submit `decision: "approve"`
+  or `decision: "reject"` with a student-visible `reason` on rejection to
+  `POST /api/v1/student-affairs/club-requests/{id}/decision`. Approval publishes
+  the club and assigns its creator in the same transaction.
+- Verified admins use `GET/PUT /api/v1/club-admin/clubs/{id}/profile` for
+  approved and active clubs they administer. The update accepts description,
+  category, and optional `logo_base64`. Club names are read-only after approval.
+
+Both request lists accept `page` and return 20 items plus `has_more`. Request
+forms accept name, description, category, and optional `logo_base64`. Logo
+uploads follow the profile picture rules, including keep and remove behavior.
+Conflicting names, a second pending request, and edits or decisions after
+closure return 409. Name matching folds case and collapses whitespace.
+
+Alembic revision `0008_club_requests` adds the request history table after
+`0007_event_reservations`. Partial unique indexes enforce one pending request
+per student and one pending request per normalized name. An advisory
+transaction lock protects the handoff from pending request to active club,
+and row locks serialize competing decisions and withdrawals.

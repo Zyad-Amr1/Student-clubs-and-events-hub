@@ -3,6 +3,7 @@ import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/account_screens.dart';
+import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
 import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -152,6 +153,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+            if (user.accountType == 'student') ...[
+              ListTile(
+                title: const Text('My Club Requests'),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ClubRequestsScreen(),
+                    ),
+                  );
+                  if (mounted) await _checkClubs();
+                },
+              ),
+              const ListTile(
+                enabled: false,
+                title: Text('My Clubs'),
+                subtitle: Text('Membership features are not available yet'),
+              ),
+              const ListTile(
+                enabled: false,
+                title: Text('My Applications'),
+                subtitle: Text('Club applications are not available yet'),
+              ),
+            ],
             const SizedBox(height: 30),
             OutlinedButton.icon(
               key: const ValueKey('profile-logout'),

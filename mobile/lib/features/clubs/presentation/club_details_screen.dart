@@ -1,6 +1,7 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
+import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -91,6 +92,9 @@ class _ClubDetailsScreenState extends State<ClubDetailsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (club.logoUrl?.startsWith('data:image/jpeg;base64,') ??
+                        false)
+                      Center(child: UploadedImage(club.logoUrl)),
                     Text(_error!),
                     TextButton(
                       onPressed: () => _load(reset: true),

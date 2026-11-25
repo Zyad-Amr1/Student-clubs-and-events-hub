@@ -3,6 +3,8 @@ import 'package:campusconnect/app/routes.dart';
 import 'package:campusconnect/core/api_client.dart';
 import 'package:campusconnect/core/portal_role.dart';
 import 'package:campusconnect/features/auth/presentation/account_screens.dart';
+import 'package:campusconnect/features/clubs/presentation/club_management_form.dart';
+import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
 import 'package:campusconnect/features/events/presentation/create_event_screen.dart';
 import 'package:campusconnect/features/events/presentation/review_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -126,17 +128,31 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
               const SizedBox(height: 10),
               for (final club in session.managedClubs)
                 Card(
-                  child: ListTile(
-                    key: ValueKey('managed-club-${club.id}'),
-                    leading: const Icon(Icons.groups_outlined),
-                    title: Text(club.name),
-                    subtitle: const Text('Create and submit events for review'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => CreateEventScreen(club: club),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        key: ValueKey('managed-club-${club.id}'),
+                        leading: const Icon(Icons.groups_outlined),
+                        title: Text(club.name),
+                        subtitle: const Text(
+                          'Create and submit events for review',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CreateEventScreen(club: club),
+                          ),
+                        ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => ManagedClubProfileScreen(club.id),
+                          ),
+                        ),
+                        child: const Text('Edit Club Profile'),
+                      ),
+                    ],
                   ),
                 ),
             ] else
@@ -158,6 +174,14 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 ),
                 icon: const Icon(Icons.fact_check_outlined),
                 label: const Text('Review pending events'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ClubRequestsScreen(review: true),
+                  ),
+                ),
+                child: const Text('Review Club Requests'),
               ),
             ],
             if (_error != null) ...[
