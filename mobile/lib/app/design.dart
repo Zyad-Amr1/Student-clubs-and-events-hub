@@ -1,15 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 
 abstract final class CampusColors {
-  static const purple = Color(0xFF681DB4);
-  static const purpleDark = Color(0xFF38085C);
-  static const purpleLight = Color(0xFF8B3FD6);
-  static const ink = Color(0xFF1E1035);
-  static const inkMuted = Color(0xFF6E5F80);
-  static const canvas = Color(0xFFF7F4FA);
-  static const line = Color(0xFFEADBFA);
-  static const lavender = Color(0xFFF0E5FA);
-  static const lavenderActive = Color(0xFFE9D6FA);
+  static const purple = Color(0xFF6926B6);
+  static const purpleDark = Color(0xFF3B126F);
+  static const purpleLight = Color(0xFF9655D5);
+  static const ink = Color(0xFF24153D);
+  static const inkMuted = Color(0xFF716483);
+  static const canvas = Color(0xFFFAF7FE);
+  static const line = Color(0xFFE9DFF5);
+  static const lavender = Color(0xFFF2E9FC);
+  static const lavenderActive = Color(0xFFE7D6F8);
   static const greenBg = Color(0xFFDDF4E6);
   static const greenFg = Color(0xFF14552F);
   static const amberBg = Color(0xFFFFF0D4);
@@ -18,15 +18,143 @@ abstract final class CampusColors {
   static const redFg = Color(0xFF8F2243);
 
   static const gradient = LinearGradient(
-    colors: [Color(0xFF390D5E), Color(0xFF601BA0), Color(0xFF4A127B)],
+    colors: [Color(0xFF421378), Color(0xFF6B2DB0), Color(0xFF4A1685)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const cardGradient = LinearGradient(
-    colors: [Color(0xFF280747), Color(0xFF4A117C)],
+    colors: [Color(0xFF6222A7), Color(0xFF9551D1)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
+  );
+}
+
+class CampusBrandLockup extends StatelessWidget {
+  const CampusBrandLockup({
+    this.inverse = false,
+    this.icon = Icons.school_rounded,
+    this.logoSize = 42,
+    this.fontSize = 22,
+    super.key,
+  });
+
+  final bool inverse;
+  final IconData icon;
+  final double logoSize;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'CampusConnect university student hub',
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: logoSize,
+          height: logoSize,
+          decoration: BoxDecoration(
+            gradient: inverse
+                ? const LinearGradient(
+                    colors: [Color(0xFFB88AFF), Color(0xFF6526AD)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : CampusColors.gradient,
+            borderRadius: BorderRadius.circular(logoSize * 0.28),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x252D0B52),
+                blurRadius: 12,
+                offset: Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Icon(icon, size: logoSize * 0.63, color: Colors.white),
+        ),
+        const SizedBox(width: 10),
+        RichText(
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -fontSize * 0.045,
+              color: inverse ? Colors.white : CampusColors.ink,
+            ),
+            children: [
+              const TextSpan(text: 'Campus'),
+              TextSpan(
+                text: 'Connect',
+                style: TextStyle(
+                  color: inverse ? Colors.white : CampusColors.purple,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class CampusQuickAction extends StatelessWidget {
+  const CampusQuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: CampusColors.lavender,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x142F1054),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: CampusColors.purple, size: 23),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: CampusColors.ink,
+                  fontSize: 11,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -105,23 +233,18 @@ class CampusHeader extends StatelessWidget {
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
       gradient: CampusColors.gradient,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, color: Colors.white, size: 24),
-            const SizedBox(width: 10),
-            const Text(
-              'CampusConnect',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                letterSpacing: 0.2,
-              ),
+            CampusBrandLockup(
+              inverse: true,
+              icon: icon,
+              logoSize: 36,
+              fontSize: 18,
             ),
             const Spacer(),
             ?trailing,
@@ -142,7 +265,7 @@ class CampusHeader extends StatelessWidget {
           style: const TextStyle(
             color: Color(0xFFF0DFFA),
             height: 1.45,
-            fontSize: 14,
+            fontSize: 15,
           ),
         ),
       ],
@@ -168,20 +291,20 @@ class CampusStatCard extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: CampusColors.line),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0C391B50),
-                blurRadius: 10,
-                offset: Offset(0, 4),
+                blurRadius: 14,
+                offset: Offset(0, 5),
               ),
             ],
           ),
@@ -250,7 +373,7 @@ class CampusSectionHeader extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 19,
             fontWeight: FontWeight.w800,
             color: CampusColors.ink,
           ),

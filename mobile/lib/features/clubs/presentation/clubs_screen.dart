@@ -17,6 +17,7 @@ class ClubsScreen extends StatefulWidget {
 class _ClubsScreenState extends State<ClubsScreen> {
   final List<CampusClub> _clubs = [];
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
   final _categoryController = TextEditingController();
   Timer? _debounce;
   int _generation = 0;
@@ -36,6 +37,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _searchFocus.dispose();
     _categoryController.dispose();
     super.dispose();
   }
@@ -147,69 +149,33 @@ class _ClubsScreenState extends State<ClubsScreen> {
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar(
-              expandedHeight: 105,
               pinned: true,
-              backgroundColor: CampusColors.purple,
-              foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: CampusColors.gradient,
-                    borderRadius: BorderRadius.vertical(
-                      bottom: Radius.circular(28),
-                    ),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(20, 40, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.groups_rounded,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Explore Clubs',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.4,
-                                ),
-                              ),
-                              Text(
-                                'Discover and join university clubs',
-                                style: TextStyle(
-                                  color: Color(0xFFECD6FC),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              backgroundColor: Colors.white,
+              foregroundColor: CampusColors.ink,
+              title: const Text(
+                'Explore Clubs',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Search clubs',
+                  onPressed: _searchFocus.requestFocus,
+                  icon: const Icon(Icons.search_rounded),
                 ),
+                const SizedBox(width: 8),
+              ],
+              bottom: const PreferredSize(
+                preferredSize: Size.fromHeight(1),
+                child: Divider(height: 1, color: CampusColors.line),
               ),
             ),
           ],
           body: Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _DiscoveryBanner(onExplore: _searchFocus.requestFocus),
+              ),
               // Search + Filter bar
               Container(
                 color: CampusColors.canvas,
@@ -222,6 +188,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                           child: TextField(
                             key: const ValueKey('club-search'),
                             controller: _searchController,
+                            focusNode: _searchFocus,
                             onChanged: (_) => _criteriaChanged(),
                             maxLength: 120,
                             decoration: InputDecoration(
@@ -290,6 +257,43 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   ],
                 ),
               ),
+              if (!_loading && _clubs.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 2),
+                  child: Row(
+                    children: [
+                      Text(
+                        '$_total ${_total == 1 ? 'Club' : 'Clubs'}',
+                        style: const TextStyle(
+                          color: CampusColors.ink,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_error == null && _clubs.length < _total)
+                        TextButton(
+                          key: const ValueKey('load-more-clubs'),
+                          onPressed: _loadingMore ? null : () => _load(),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: Text(
+                            _loadingMore ? 'Loading…' : 'Load more',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        )
+                      else
+                        const Text(
+                          'Browse by category',
+                          style: TextStyle(
+                            color: CampusColors.inkMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               // Club list
               Expanded(
                 child: _loading
@@ -311,22 +315,12 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: () => _load(reset: true),
-                        child: GridView.builder(
+                        child: ListView.builder(
                           key: const ValueKey('club-list'),
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                mainAxisExtent: 260,
-                              ),
-                          itemCount:
-                              _clubs.length +
-                              (_clubs.length < _total || _error != null
-                                  ? 1
-                                  : 0),
+                          itemExtent: 108,
+                          itemCount: _clubs.length + (_error != null ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == _clubs.length) {
                               return Center(
@@ -345,19 +339,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                                             ),
                                           ],
                                         )
-                                      : TextButton(
-                                          key: const ValueKey(
-                                            'load-more-clubs',
-                                          ),
-                                          onPressed: _loadingMore
-                                              ? null
-                                              : () => _load(),
-                                          child: Text(
-                                            _loadingMore
-                                                ? 'Loading...'
-                                                : 'Load more clubs',
-                                          ),
-                                        ),
+                                      : const SizedBox.shrink(),
                                 ),
                               );
                             }
@@ -494,126 +476,140 @@ class _ClubCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(18),
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 8),
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: CampusColors.line),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0C391B50),
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Club icon avatar
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: CampusColors.lavender,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    categoryIcon(club.category),
-                    color: CampusColors.purple,
-                    size: 24,
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              club.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: CampusColors.ink,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              club.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                color: CampusColors.inkMuted,
-                height: 1.3,
-              ),
-            ),
-            const Spacer(),
-            // Category chip
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 color: CampusColors.lavender,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Icon(
+                categoryIcon(club.category),
+                color: CampusColors.purple,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    categoryIcon(club.category),
-                    size: 10,
-                    color: CampusColors.purple,
+                  Text(
+                    club.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: CampusColors.ink,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(height: 3),
+                  Text(
+                    club.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: CampusColors.inkMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     club.category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
+                      color: CampusColors.purple,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: CampusColors.purple,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            // Open the club to see its real membership options.
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: CampusColors.purple,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 8),
+            Tooltip(
+              message: 'View ${club.name}',
+              child: const Icon(
+                Icons.chevron_right_rounded,
+                color: CampusColors.purple,
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _DiscoveryBanner extends StatelessWidget {
+  const _DiscoveryBanner({required this.onExplore});
+
+  final VoidCallback onExplore;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: CampusColors.purpleDark,
+    borderRadius: BorderRadius.circular(22),
+    child: InkWell(
+      onTap: onExplore,
+      borderRadius: BorderRadius.circular(22),
+      child: Ink(
+        height: 112,
+        decoration: BoxDecoration(
+          gradient: CampusColors.cardGradient,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -4,
+              top: -23,
+              child: Icon(
+                Icons.school_rounded,
+                size: 144,
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 108, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Find Your Community',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      height: 1.1,
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  minimumSize: const Size.fromHeight(32),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Discover student clubs and meet like-minded peers.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
                   ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_forward, size: 14),
-                    SizedBox(width: 3),
-                    Text('View club'),
-                  ],
-                ),
+                ],
               ),
             ),
           ],

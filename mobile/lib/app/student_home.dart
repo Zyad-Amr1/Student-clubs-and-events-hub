@@ -8,7 +8,6 @@ import 'package:campusconnect/features/clubs/presentation/club_lifecycle_screen.
 import 'package:campusconnect/features/clubs/presentation/clubs_screen.dart';
 import 'package:campusconnect/features/events/presentation/my_events_screen.dart';
 import 'package:campusconnect/features/events/presentation/student_event_details_screen.dart';
-import 'package:campusconnect/shared/widgets/pick_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 class StudentHome extends StatefulWidget {
@@ -64,10 +63,8 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
   String? _error;
   String? _reservationError;
   List<CampusClub> _clubs = [];
-  int _totalClubs = 0;
   List<EventReservation> _reservations = [];
   CampusEvent? _featuredEvent;
-  int _upcomingEventsCount = 0;
 
   List<EventReservation> get _upcomingReservations => _reservations
       .where(
@@ -100,7 +97,6 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
       // Load clubs list and total
       final clubPage = await session.api.clubs(token, page: 1);
       _clubs = clubPage.clubs;
-      _totalClubs = clubPage.total;
 
       // Load active reservations
       try {
@@ -112,16 +108,13 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
         _reservationError = 'Could not load your reservations. Please retry.';
       }
 
-      // Count only the student's upcoming reservations.
       CampusEvent? featured;
-      var upcomingCount = 0;
 
       final now = DateTime.now();
       for (final r in _reservations) {
         if (r.status != ReservationStatus.cancelled &&
             r.event.startsAt.isAfter(now)) {
           featured ??= r.event;
-          upcomingCount++;
         }
       }
 
@@ -143,7 +136,6 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
       if (!mounted) return;
       setState(() {
         _featuredEvent = featured;
-        _upcomingEventsCount = upcomingCount;
         _loading = false;
       });
     } on ApiFailure catch (err) {
@@ -218,7 +210,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             // Purple Top Header matching screenshot
-            _buildHeader(context, firstName, user?.picture),
+            _buildHeader(context, firstName),
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -227,52 +219,46 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                 children: [
                   const SizedBox(height: 18),
 
-                  // 3 Quick Stat Cards
+                  // Shortcuts map only to existing app destinations.
                   Row(
                     children: [
-                      CampusStatCard(
-                        icon: Icons.calendar_today_outlined,
-                        value: _reservationError == null
-                            ? '$_upcomingEventsCount'
-                            : '—',
-                        label: 'Upcoming Events',
+                      CampusQuickAction(
+                        icon: Icons.groups_rounded,
+                        label: 'Explore Clubs',
+                        onTap: widget.onOpenClubs,
+                      ),
+                      CampusQuickAction(
+                        icon: Icons.event_outlined,
+                        label: 'Events',
                         onTap: widget.onOpenCalendar,
                       ),
-                      const SizedBox(width: 10),
-                      CampusStatCard(
-                        icon: Icons.confirmation_num_outlined,
-                        value: _reservationError == null
-                            ? '${_reservations.where((r) => r.status != ReservationStatus.cancelled).length}'
-                            : '—',
+                      CampusQuickAction(
+                        icon: Icons.bookmark_border_rounded,
                         label: 'My Bookings',
                         onTap: widget.onOpenCalendar,
                       ),
-                      const SizedBox(width: 10),
-                      CampusStatCard(
-                        icon: Icons.groups_outlined,
-                        value: '$_totalClubs',
-                        label: 'Campus Clubs',
-                        onTap: widget.onOpenClubs,
+                      CampusQuickAction(
+                        icon: Icons.calendar_month_outlined,
+                        label: 'Calendar',
+                        onTap: widget.onOpenCalendar,
                       ),
                     ],
                   ),
 
-                  // Featured Event Card (if approved event discovered)
-                  if (_featuredEvent != null) ...[
-                    const SizedBox(height: 20),
-                    _buildFeaturedCard(context, _featuredEvent!),
-                  ],
-
                   const SizedBox(height: 24),
 
-                  // My Upcoming Events Section
+                  // The summary and reservation states come from the backend.
                   CampusSectionHeader(
-                    title: 'My Upcoming Events',
+                    title: 'Upcoming Events',
                     icon: Icons.calendar_month_outlined,
                     actionLabel: 'View Calendar',
                     onAction: widget.onOpenCalendar,
                   ),
                   const SizedBox(height: 8),
+                  if (_featuredEvent != null) ...[
+                    _buildFeaturedCard(context, _featuredEvent!),
+                    const SizedBox(height: 12),
+                  ],
                   _buildUpcomingEventsList(context),
 
                   const SizedBox(height: 26),
@@ -297,39 +283,32 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context,
-    String firstName,
-    String? pictureUrl,
-  ) {
+  Widget _buildHeader(BuildContext context, String firstName) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
-        20,
-        MediaQuery.of(context).padding.top + 14,
-        20,
-        24,
+        18,
+        MediaQuery.of(context).padding.top + 8,
+        18,
+        18,
       ),
-      decoration: const BoxDecoration(
-        gradient: CampusColors.gradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100F0730),
+            blurRadius: 16,
+            offset: Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.school_rounded, color: Colors.white, size: 24),
-              const SizedBox(width: 8),
-              const Text(
-                'CampusConnect',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  letterSpacing: 0.2,
-                ),
-              ),
+              const CampusBrandLockup(logoSize: 34, fontSize: 18),
               const Spacer(),
               IconButton(
                 tooltip: 'Notifications',
@@ -341,7 +320,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                 ),
                 icon: const Icon(
                   Icons.notifications_none_rounded,
-                  color: Colors.white,
+                  color: CampusColors.purple,
                   size: 24,
                 ),
               ),
@@ -352,7 +331,7 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                     Navigator.of(context).pushNamed(AppRoutes.profile),
                 icon: const Icon(
                   Icons.account_circle_outlined,
-                  color: Colors.white,
+                  color: CampusColors.purple,
                   size: 26,
                 ),
               ),
@@ -361,55 +340,37 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
           const SizedBox(height: 18),
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    width: 2,
-                  ),
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-                child: ClipOval(
-                  child: pictureUrl != null
-                      ? UploadedImage(pictureUrl)
-                      : Center(
-                          child: Text(
-                            firstName.isNotEmpty ? firstName[0] : 'S',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Hi, $firstName 👋',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontSize: 21),
                     ),
                     const SizedBox(height: 3),
                     const Text(
-                      'Discover clubs, events, and campus life',
+                      'What’s happening on campus?',
                       style: TextStyle(
-                        color: Color(0xFFECD6FC),
+                        color: CampusColors.inkMuted,
                         fontSize: 13,
-                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  width: 100,
+                  height: 78,
+                  child: Image.asset(
+                    'assets/images/campus-hero.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.centerRight,
+                  ),
                 ),
               ),
             ],
@@ -423,6 +384,11 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
     return Container(
       decoration: BoxDecoration(
         gradient: CampusColors.cardGradient,
+        image: const DecorationImage(
+          image: AssetImage('assets/images/campus-hero.png'),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(Color(0xAA3B126F), BlendMode.srcOver),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
@@ -462,37 +428,6 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                     ),
                   ],
                 ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
@@ -590,20 +525,6 @@ class _StudentDashboardViewState extends State<_StudentDashboardView> {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.12),
-                ),
-                child: const Icon(
-                  Icons.smart_toy_outlined,
-                  size: 42,
-                  color: Colors.white,
                 ),
               ),
             ],
