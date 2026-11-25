@@ -225,6 +225,8 @@ void main() {
     await tester.tap(find.text('Robotics Club'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('draft-title')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('create-draft')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('create-draft')));
     await tester.pumpAndSettle();
     expect(find.text('Required field'), findsWidgets);
@@ -248,6 +250,8 @@ void main() {
       find.byKey(const ValueKey('pending-event-$eventId')),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('approve-$eventId')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('approve-$eventId')));
     await tester.pumpAndSettle();
     expect(find.textContaining('approved and published'), findsOneWidget);
@@ -270,6 +274,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('open-pending-review')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('approve-$eventId')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('approve-$eventId')));
     await tester.pumpAndSettle();
