@@ -9,8 +9,6 @@ abstract class TokenStore {
   Future<String?> read();
   Future<void> write(String token);
   Future<void> clear();
-
-
 }
 
 /// Optional preference interface: old Student token stores remain compatible.
