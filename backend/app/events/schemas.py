@@ -51,3 +51,20 @@ class DraftEventResponse(BaseModel):
     is_published: bool
     created_at: datetime
     updated_at: datetime
+
+
+from typing import Literal
+
+
+class EventReviewDecision(BaseModel):
+    """Student Affairs supplies a decision only, never publication state."""
+
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["approve", "reject"]
+
+
+class PendingEventPage(BaseModel):
+    events: list[DraftEventResponse]
+    page: int
+    page_size: int
+    total: int
