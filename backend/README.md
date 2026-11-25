@@ -313,6 +313,29 @@ Approval status, active state, and database timestamps are not exposed.
 The PostgreSQL `clubs` table is added by Alembic revision
 `0003_create_clubs`, after `0002_create_auth_sessions`.
 
+### Search and category filtering (CAMP-9)
+
+The existing Student-only `GET /api/v1/clubs` endpoint accepts two optional query
+parameters. `search` matches a literal substring of the club name without case
+sensitivity (maximum 120 characters). `category` matches the full category value
+without case sensitivity (maximum 80 characters); partial category names are not
+matches. Both values are trimmed before use, and blank values have no filtering
+effect. If both parameters are present, results must match **both** filters.
+Literal `%` and `_` characters in search text are not treated as SQL wildcards.
+
+For example:
+
+```http
+GET /api/v1/clubs?search=robotics&category=Technology&page=1&page_size=20
+Authorization: Bearer <student-access-token>
+```
+
+Filtering happens only among approved active clubs, before pagination, so
+`total` counts the filtered visible clubs across all pages. The response format,
+stable ordering, status codes (401/403/422), and page limits are unchanged.
+Oversized search/category values receive HTTP 422. No additional migration is
+required for these read-only filters.
+
 `GET /api/v1/clubs/{club_id}` returns details for an approved, active club and
 a bounded page of its upcoming events. It requires an active Student session;
 missing or invalid credentials return HTTP 401, other account types return
@@ -332,3 +355,32 @@ publish an event.
 
 The PostgreSQL `events` table is added by Alembic revision
 `0004_create_events`, after `0003_create_clubs`.
+
+## Submit a club draft event for Student Affairs approval (CAMP-11)
+
+After the club-scoped administrator association and event tables are available,
+an active authenticated **Student** with a server-managed administrator grant
+for the specified active club can submit their existing draft:
+
+`POST /api/v1/clubs/{club_id}/events/{event_id}/submit`
+
+Requires `Authorization: Bearer <access_token>` and **forbids any request body**. Any nonempty request body, including `{}`, returns HTTP 422 without changing event state. A successful
+request returns HTTP 200 and the event fields, with `approval_status: "pending"`
+and `is_published: false`. Submission does **not** perform an approval decision,
+publish the event, or notify Student Affairs. Public Club Details continues to
+hide both drafts and pending events.
+
+Responses: 401 for missing/invalid authentication; 403 for Student Affairs
+(non-Student roles); 404 for unknown, inactive, or unmanaged clubs and events
+(without revealing their existence); 409 if the event is not an unpublished
+draft; 422 for an invalid UUID or draft schedule/details. The event's persisted
+start must still be in the future and timezone-aware at submission time.
+The state transition is protected by PostgreSQL row locks and a single
+transaction; concurrent duplicate requests cannot both succeed.
+
+Administrator grants are not accepted from the request or JWT; they are looked
+up in the database by `club_id` and authenticated user ID. There is no public
+club-administrator assignment API. The event is never made public merely by
+creation or submission. The feature adds **no new database migration** beyond
+CAMP-10's `0005_club_administrators`, and is currently a stacked PR pending
+that prerequisite's integration.

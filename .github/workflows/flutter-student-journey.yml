@@ -1,0 +1,39 @@
+name: Flutter student journey
+
+on:
+  push:
+    branches: [feat/flutter-student-discovery-integration]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-student-journey.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-student-journey.yml'
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter SDK version
+        run: flutter --version
+      - name: Resolve Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+      - name: Check Dart formatting
+        working-directory: mobile
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Flutter analyzer
+        working-directory: mobile
+        run: flutter analyze
+      - name: Flutter tests
+        working-directory: mobile
+        run: flutter test --reporter expanded --timeout 45s
+      - name: Android debug build
+        working-directory: mobile
+        run: flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:8000

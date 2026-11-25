@@ -20,6 +20,10 @@ def configure_prompts(monkeypatch, *, email="synthetic@example.edu", confirmatio
     monkeypatch.setattr(cli, "getpass", lambda _: next(passwords))
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(cli, "get_database_url", lambda: _DATABASE_URL, raising=False)
+    # These legacy tests mock the account creation behavior. The singleton
+    # check is exercised against disposable PostgreSQL separately.
+    monkeypatch.setattr(cli, "_student_affairs_exists", lambda db: False)
+    monkeypatch.setattr(cli, "_lock_student_affairs_provisioning", lambda db: None)
 
 
 def test_provisioning_confirms_target_before_collecting_account_details(monkeypatch, capsys):
