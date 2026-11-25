@@ -285,4 +285,119 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'valid_draft_creation_and_submission_shows_pending_unpublished',
+    (tester) async {
+      final transport = WorkflowTransport(role: 'student');
+      await tester.pumpWidget(
+        CampusConnectApp(
+          api: workflowApi(transport),
+          tokenStore: WorkflowStore(portal: 'clubAdmin'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Robotics Club'));
+      await tester.pumpAndSettle();
+
+      final fields = {
+        'draft-title': 'AI Workshop',
+        'draft-description': 'Practical project session',
+        'draft-venue': 'Engineering Hall',
+        'draft-capacity': '40',
+      };
+      for (final entry in fields.entries) {
+        final field = find.byKey(ValueKey(entry.key));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, entry.value);
+      }
+      final pickStart = find.byKey(const ValueKey('pick-start-date'));
+      await tester.ensureVisible(pickStart);
+      await tester.tap(pickStart);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      final create = find.byKey(const ValueKey('create-draft'));
+      await tester.ensureVisible(create);
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+      expect(find.text('Status: draft'), findsOneWidget);
+      expect(find.text('Published: No'), findsOneWidget);
+      final createIndex = transport.calls.lastIndexOf(
+        '/api/v1/clubs/$clubId/events',
+      );
+      expect(createIndex, greaterThanOrEqualTo(0));
+      expect(transport.methods[createIndex], 'POST');
+      final payload = jsonDecode(transport.bodies[createIndex]!) as Map;
+      expect(payload['title'], 'AI Workshop');
+      expect(payload['description'], 'Practical project session');
+      expect(payload['venue'], 'Engineering Hall');
+      expect(payload['seat_capacity'], 40);
+      expect(
+        DateTime.parse(payload['starts_at'] as String).isAfter(DateTime.now()),
+        isTrue,
+      );
+      expect(payload.containsKey('approval_status'), isFalse);
+      expect(payload.containsKey('is_published'), isFalse);
+
+      final submit = find.byKey(const ValueKey('submit-draft'));
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Status: pending'), findsOneWidget);
+      expect(find.text('Published: No'), findsOneWidget);
+      expect(
+        find.text('Submitted. Awaiting Student Affairs approval.'),
+        findsOneWidget,
+      );
+      expect(submit, findsNothing);
+      final submitIndex = transport.calls.lastIndexOf(
+        '/api/v1/clubs/$clubId/events/$eventId/submit',
+      );
+      expect(submitIndex, greaterThan(createIndex));
+      expect(transport.methods[submitIndex], 'POST');
+      expect(transport.bodies[submitIndex], isNull);
+    },
+  );
+
+  testWidgets('affairs_rejects_event_and_refreshes_pending_queue', (
+    tester,
+  ) async {
+    final transport = WorkflowTransport();
+    await tester.pumpWidget(
+      CampusConnectApp(
+        api: workflowApi(transport),
+        tokenStore: WorkflowStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-pending-review')));
+    await tester.pumpAndSettle();
+    final pending = find.byKey(const ValueKey('pending-event-$eventId'));
+    expect(pending, findsOneWidget);
+    final reject = find.byKey(const ValueKey('reject-$eventId'));
+    await tester.ensureVisible(reject);
+    await tester.tap(reject);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('AI Workshop: rejected and unpublished'),
+      findsOneWidget,
+    );
+    expect(find.text('No pending events to review.'), findsOneWidget);
+    expect(find.text('Awaiting review: 0'), findsOneWidget);
+    expect(pending, findsNothing);
+    final reviewIndex = transport.calls.lastIndexOf(
+      '/api/v1/student-affairs/events/$eventId/review',
+    );
+    expect(reviewIndex, greaterThanOrEqualTo(0));
+    expect(transport.methods[reviewIndex], 'POST');
+    expect(jsonDecode(transport.bodies[reviewIndex]!), {'decision': 'reject'});
+    expect(
+      transport.calls.lastIndexOf('/api/v1/student-affairs/events/pending'),
+      greaterThan(reviewIndex),
+    );
+  });
 }
