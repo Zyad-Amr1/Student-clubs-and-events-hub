@@ -32,6 +32,7 @@ router = APIRouter(
     summary="Browse approved university clubs",
     description=(
         "Returns only approved, active clubs to authenticated Student accounts. "
+        "Supports optional case-insensitive partial name search and exact category filtering. "
         "Results are ordered by name and UUID for stable pagination."
     ),
     responses={
@@ -49,12 +50,34 @@ def browse_clubs(
         int,
         Query(ge=1, le=MAX_PAGE_SIZE, description="Number of clubs per page, up to 100."),
     ] = DEFAULT_PAGE_SIZE,
+    search: Annotated[
+        str | None,
+        Query(
+            max_length=120,
+            description="Optional case-insensitive literal substring of a club name.",
+        ),
+    ] = None,
+    category: Annotated[
+        str | None,
+        Query(
+            max_length=80,
+            description="Optional category name, matched exactly without case sensitivity.",
+        ),
+    ] = None,
 ) -> ClubBrowseResponse:
-    """Return a bounded page of approved, active clubs without internal state."""
-    visible = (
+    """Return filtered, approved active clubs with safe fields and stable pagination."""
+    visible = [
         Club.approval_status == ClubApprovalStatus.APPROVED,
         Club.is_active.is_(True),
-    )
+    ]
+    # Empty or whitespace-only filters mean no filter.
+    if search is not None and (name_term := search.strip()):
+        # autoescape protects literal % and _ characters from SQL LIKE wildcard behavior.
+        visible.append(Club.name.icontains(name_term, autoescape=True))
+    if category is not None and (category_term := category.strip()):
+        visible.append(func.lower(Club.category) == category_term.lower())
+
+    # Count after applying *all* filters and before page slicing.
     total = db.scalar(select(func.count()).select_from(Club).where(*visible)) or 0
     clubs = db.scalars(
         select(Club)
@@ -111,6 +134,7 @@ def get_club_details(
         Event.club_id == club.id,
         Event.approval_status == EventApprovalStatus.APPROVED,
         Event.is_published.is_(True),
+        Event.cancelled_at.is_(None),
         Event.starts_at > now,
     )
     event_query = select(Event).join(Club, Event.club_id == Club.id).where(*visible_events)

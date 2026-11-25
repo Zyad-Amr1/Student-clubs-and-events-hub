@@ -82,3 +82,5 @@ class Club(Base):
         server_default=func.now(),
         server_onupdate=FetchedValue(),
     )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archive_reason: Mapped[str | None] = mapped_column(Text)

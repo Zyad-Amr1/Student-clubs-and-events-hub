@@ -294,7 +294,7 @@ and refuses password entry when echo cannot be suppressed. It validates the
 same fields as registration, hashes with scrypt, and creates a new Student
 Affairs account. An existing email or University ID is rejected without
 changing the existing account. Public registration continues to create only
-Students. CAMP-63 provisioning uses the existing schema and adds no migration.
+Students. Migration `0013_club_head_requests` enforces the Student Affairs singleton.
 
 ## Club browsing API
 
@@ -312,6 +312,29 @@ Approval status, active state, and database timestamps are not exposed.
 
 The PostgreSQL `clubs` table is added by Alembic revision
 `0003_create_clubs`, after `0002_create_auth_sessions`.
+
+### Search and category filtering (CAMP-9)
+
+The existing Student-only `GET /api/v1/clubs` endpoint accepts two optional query
+parameters. `search` matches a literal substring of the club name without case
+sensitivity (maximum 120 characters). `category` matches the full category value
+without case sensitivity (maximum 80 characters); partial category names are not
+matches. Both values are trimmed before use, and blank values have no filtering
+effect. If both parameters are present, results must match **both** filters.
+Literal `%` and `_` characters in search text are not treated as SQL wildcards.
+
+For example:
+
+```http
+GET /api/v1/clubs?search=robotics&category=Technology&page=1&page_size=20
+Authorization: Bearer <student-access-token>
+```
+
+Filtering happens only among approved active clubs, before pagination, so
+`total` counts the filtered visible clubs across all pages. The response format,
+stable ordering, status codes (401/403/422), and page limits are unchanged.
+Oversized search/category values receive HTTP 422. No additional migration is
+required for these read-only filters.
 
 `GET /api/v1/clubs/{club_id}` returns details for an approved, active club and
 a bounded page of its upcoming events. It requires an active Student session;
@@ -332,3 +355,238 @@ publish an event.
 
 The PostgreSQL `events` table is added by Alembic revision
 `0004_create_events`, after `0003_create_clubs`.
+
+## Submit a club draft event for Student Affairs approval (CAMP-11)
+
+After the club-scoped administrator association and event tables are available,
+an active authenticated **Student** with a server-managed administrator grant
+for the specified active club can submit their existing draft:
+
+`POST /api/v1/clubs/{club_id}/events/{event_id}/submit`
+
+Requires `Authorization: Bearer <access_token>` and **forbids any request body**. Any nonempty request body, including `{}`, returns HTTP 422 without changing event state. A successful
+request returns HTTP 200 and the event fields, with `approval_status: "pending"`
+and `is_published: false`. Submission does **not** perform an approval decision,
+publish the event, or notify Student Affairs. Public Club Details continues to
+hide both drafts and pending events.
+
+Responses: 401 for missing/invalid authentication; 403 for Student Affairs
+(non-Student roles); 404 for unknown, inactive, or unmanaged clubs and events
+(without revealing their existence); 409 if the event is not an unpublished
+draft; 422 for an invalid UUID or draft schedule/details. The event's persisted
+start must still be in the future and timezone-aware at submission time.
+The state transition is protected by PostgreSQL row locks and a single
+transaction; concurrent duplicate requests cannot both succeed.
+
+Administrator grants are not accepted from the request or JWT; they are looked
+up in the database by `club_id` and authenticated user ID. There is no public
+club-administrator assignment API. The event is never made public merely by
+creation or submission. The feature adds **no new database migration** beyond
+CAMP-10's `0005_club_administrators`, and is currently a stacked PR pending
+that prerequisite's integration.
+
+## Student event reservations (CAMP-14–17)
+
+All routes below require a current bearer session for an active **Student**.
+Student Affairs accounts receive HTTP 403; missing, invalid, expired, revoked,
+or inactive-user sessions receive HTTP 401. Club Admins remain Students and
+may reserve events as students.
+
+### Reserve a seat or join the waitlist
+
+`POST /api/v1/events/{event_id}/reservations` has no request body. The event
+must belong to an active approved club and be both approved and published, with
+a start time in the future. A free seat returns HTTP 201 with `status:
+"confirmed"`; a full event returns HTTP 201 with `status: "waitlisted"` and a
+1-based `waitlist_position`. A duplicate active reservation returns HTTP 409;
+an unknown or unavailable event returns HTTP 404.
+
+```json
+{
+  "event_id": "<event-uuid>",
+  "status": "waitlisted",
+  "waitlist_position": 2,
+  "event": {
+    "id": "<event-uuid>",
+    "club_id": "<club-uuid>",
+    "title": "Engineering Workshop",
+    "description": "Practical robotics session",
+    "venue": "Engineering Hall",
+    "starts_at": "2030-05-10T10:00:00Z",
+    "ends_at": "2030-05-10T12:00:00Z",
+    "seat_capacity": 40
+  }
+}
+```
+
+### Cancel a reservation
+
+`DELETE /api/v1/events/{event_id}/reservations` cancels only the authenticated
+Student's own reservation. It returns HTTP 204 on success and HTTP 404 when
+that Student has no reservation for the event. Cancelling a waitlist entry does
+not release a confirmed seat. Cancelling a confirmed reservation promotes the
+earliest active Student still on the waitlist in the same transaction, while
+the event remains available and in the future. Started events do not promote
+waitlisted students.
+
+### Read the current Student's reservations
+
+`GET /api/v1/me/reservations` returns only the authenticated Student's active
+confirmed and waitlisted reservations. The `reservations` array uses the same
+object shape shown above; event details include the event and club UUID, title,
+description, venue, start/end time, and seat capacity. Confirmed entries have
+`waitlist_position: null`; waitlisted entries have their current 1-based
+position among active Student waitlist entries. Results are ordered by event
+start time.
+
+### Persistence and concurrency
+
+Alembic revision `0007_event_reservations` follows
+`0006_one_admin_per_club`. It creates one table with a unique
+`(event_id, user_id)` constraint, foreign keys to events and users, a checked
+confirmed/waitlisted state, and a PostgreSQL identity value used as persisted
+FIFO order. RSVP and cancellation lock the event row before reading or changing
+seat counts. Promotion updates the earliest eligible queue entry and commits
+with the cancellation, so concurrent requests cannot oversubscribe a published
+event through these APIs. Cancelling deletes the active reservation row, which
+allows the Student to register again later.
+
+## Student account management
+
+Authenticated students use `GET /api/v1/auth/me` and
+`PUT /api/v1/auth/me` for their own profile. The update replaces the name and
+optional academic fields. Email and university ID are read-only. Omit
+`picture_base64` to keep the current avatar or send null to remove it. Uploaded
+JPEG/PNG files are limited to 512 KiB and 2048 × 2048 pixels and stored as small,
+re-encoded JPEGs without their original metadata.
+
+`GET /api/v1/auth/academic-catalog` provides the university demo catalog.
+It includes Engineering (Computer, Electrical and Mechanical Engineering),
+Science (Computer Science, Mathematics and Physics), Business (Accounting and
+Management), and academic years 1 through 5. These fields remain optional.
+
+`POST /api/v1/auth/me/password` takes `current_password`, `new_password`, and
+`confirm_password`. An incorrect current password returns 400. The current
+session continues until logout or expiry. `POST /api/v1/auth/logout` revokes
+the calling session.
+
+`GET /api/v1/auth/me/managed-clubs` lists the caller's current active,
+approved club assignments (possibly empty) for the Student Profile.
+
+## Club creation requests and club profile edits
+
+- Students use `GET/POST /api/v1/me/club-requests` to list their history and
+  create a request. `PUT /api/v1/me/club-requests/{id}` edits a pending request,
+  and `POST /api/v1/me/club-requests/{id}/withdraw` closes it without deleting it.
+- Student Affairs uses `GET /api/v1/student-affairs/club-requests` for the
+  pending queue and `GET /api/v1/student-affairs/club-requests/{id}/similar`
+  to compare active clubs in the same category. Submit `decision: "approve"`
+  or `decision: "reject"` with a student-visible `reason` on rejection to
+  `POST /api/v1/student-affairs/club-requests/{id}/decision`. Approval publishes
+  the club and assigns its creator in the same transaction.
+- Verified admins use `GET/PUT /api/v1/club-admin/clubs/{id}/profile` for
+  approved and active clubs they administer. The update accepts description,
+  category, and optional `logo_base64`. Club names are read-only after approval.
+
+Both request lists accept `page` and return 20 items plus `has_more`. Request
+forms accept name, description, category, and optional `logo_base64`. Logo
+uploads follow the profile picture rules, including keep and remove behavior.
+Conflicting names, a second pending request, and edits or decisions after
+closure return 409. Name matching folds case and collapses whitespace.
+
+Alembic revision `0008_club_requests` adds the request history table after
+`0007_event_reservations`. Partial unique indexes enforce one pending request
+per student and one pending request per normalized name. An advisory
+transaction lock protects the handoff from pending request to active club,
+and row locks serialize competing decisions and withdrawals.
+
+## Membership applications and interview booking
+
+Students submit from Club Details using `POST /api/v1/clubs/{id}/applications`.
+`GET /api/v1/me/applications` shows their history. `GET /api/v1/me/memberships`
+shows accepted applications as memberships. Club admins use
+`GET /api/v1/club-admin/clubs/{id}/applications` and post a decision of
+`accepted` or `interview_required` to `…/applications/{application_id}/decision`.
+The original submission time and review milestones are retained. This foundation
+has one application per student and club. Reapplication, rejection and
+post-interview membership decisions require separate lifecycle rules.
+
+Interview days use **UTC** for both the calendar date and the configured
+availability windows. Admins manage these through
+`GET /api/v1/club-admin/clubs/{id}/interview-days` and
+`PUT …/interview-days/by-date/{YYYY-MM-DD}`. The update sends `capacity`,
+`duration_minutes`, and `periods` with `start_minute` and `end_minute` measured
+from midnight UTC. A day can be published before its availability is configured.
+
+An eligible applicant uses `GET/PUT/DELETE /api/v1/me/applications/{id}/interview`
+to see/select/change a day or withdraw their unpublished selection. PUT takes
+only `day_id`. The booking remains `unscheduled` and holds day capacity until
+publication, withdrawal, a day change, cancellation or UTC midnight at the
+end of the selected day. An expired selection exposes no appointment time.
+If the student changes or withdraws it later, the expiry boundary is stored
+with the original selection. No worker is needed to enforce expiry.
+The admin previews via `GET …/interview-days/{day_id}/schedule` and publishes
+all or a subset via POST to the same route, passing selection IDs and their
+previewed start and end timestamps. Publication rejects stale previews and
+checks existing appointments across both the club and the applicant.
+Published appointments retain their times when the schedule regenerates.
+
+Admins post targets to `…/interview-days/{day_id}/cancellation-preview`, then
+submit the same target, preview token and student-visible reason to `…/cancel`.
+Targets are an individual published appointment, an exact availability period,
+or the day. The server rejects a stale preview. A period cancellation removes
+that period and cancels its published appointments. Day-only selections can
+wait for added hours. Cancelling the full day releases both unpublished
+selections and affected appointments, and requires students to choose another
+day. Audit history keeps actor, scope, reason and original appointment times.
+The application stays open for interview booking. Admins use
+`PUT …/interview-days/{day_id}/appointments/{selection_id}/attendance` to record
+`attended` or `no_show` once the confirmed appointment has ended.
+
+The Student Calendar opens Interview Calendar, which loads each current
+appointment or terminal booking status from `GET /api/v1/me/interview-appointments`.
+`GET /api/v1/me/interview-notices` lists confirmations, cancellations and new-day
+notices. Flutter opens the current booking from an entry or notice, even when
+the notice describes a past state. Notices are stored in the same transaction
+as the action that created them. Unpublished schedule previews stay private
+to the club administrator.
+
+Migration `0009_membership_applications` adds membership records after `0008`.
+Migration `0010_interview_booking` adds days, preserved day selection history,
+and confirmed times. Club row locks serialize day selections and capacity
+edits. An advisory transaction lock serializes publication across clubs to
+prevent one applicant from receiving overlapping appointments.
+
+Migration `0011_interview_lifecycle` adds expiry and attendance fields,
+cancellation audit records, and durable student notices. It backfills
+confirmation notices for appointments published under `0010`. Its downgrade
+refuses to discard recorded cancellation, expiry or attendance history.
+
+CAMP-56 archive status and archive reasons depend on the separate club
+lifecycle work. The current admin routes require an approved, active club.
+
+
+## Club Head applications and Student Affairs singleton
+
+Apply migration `0013_club_head_requests` before deploying this version. It
+rejects upgrades with more than one Student Affairs account so an operator can
+resolve the existing accounts deliberately. PostgreSQL permits one account of
+that type, including inactive accounts. Use the existing interactive command
+`python -m app.auth.provision_student_affairs` once per database, and keep the
+chosen fixed credentials in the project lead's password manager. The password
+prompt does not echo and only the password hash is stored. Sign in through the
+same Flutter sign-in screen as Students.
+
+- `GET /api/v1/clubs/{club_id}/head-vacancy` returns `open`, `locked`, or
+  `assigned` for an active, approved club.
+- `POST /api/v1/clubs/{club_id}/head-requests` submits the caller's application.
+  The club row serializes applications and assignment and PostgreSQL enforces
+  one pending application and one administrator grant per club. Database triggers
+  also prevent a pending request and an active grant from coexisting.
+- `GET /api/v1/me/club-head-requests` returns the current Student's history.
+- `GET /api/v1/student-affairs/club-head-requests` lists pending requests.
+- `POST /api/v1/student-affairs/club-head-requests/{id}/decision` accepts an
+  approval or a rejection with a visible reason. Approval adds the normal
+  club-scoped administrator grant and preserves the Student account. Rejection
+  preserves the request and reopens applications when the club is active and
+  no Head is assigned.

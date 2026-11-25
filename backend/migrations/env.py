@@ -7,7 +7,14 @@ from sqlalchemy.pool import NullPool
 from app.config import DatabaseConfigurationError, get_database_url
 from app.models.auth_session import AuthSession  # register table with shared Base metadata
 from app.models.club import Club  # register table with shared Base metadata
+from app.models.club_head_request import ClubHeadRequest
+from app.models.club_request import ClubRequest  # register club request history
+from app.models.membership_application import MembershipApplication
+from app.models.interview import InterviewCancellation, InterviewDay, InterviewNotice, InterviewSelection
+from app.models.club_lifecycle import ClubLifecycleAudit, ClubLifecycleNotice
+from app.models.club_administrator import ClubAdministrator  # club-scoped access grants
 from app.models.event import Event  # register table with shared Base metadata
+from app.models.event_reservation import EventReservation  # student event reservations
 from app.models.user import User
 
 
