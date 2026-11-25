@@ -520,20 +520,47 @@ from midnight UTC. A day can be published before its availability is configured.
 
 An eligible applicant uses `GET/PUT/DELETE /api/v1/me/applications/{id}/interview`
 to see/select/change a day or withdraw their unpublished selection. PUT takes
-only `day_id`. Selecting a day reserves capacity without assigning a time.
+only `day_id`. The booking remains `unscheduled` and holds day capacity until
+publication, withdrawal, a day change, cancellation or UTC midnight at the
+end of the selected day. An expired selection exposes no appointment time.
+If the student changes or withdraws it later, the expiry boundary is stored
+with the original selection. No worker is needed to enforce expiry.
 The admin previews via `GET …/interview-days/{day_id}/schedule` and publishes
 all or a subset via POST to the same route, passing selection IDs and their
 previewed start and end timestamps. Publication rejects stale previews and
 checks existing appointments across both the club and the applicant.
 Published appointments retain their times when the schedule regenerates.
 
-The Student Calendar opens Interview Calendar, which loads confirmation
-notices and published times from `GET /api/v1/me/interview-appointments`.
-Unpublished times are private to the administrator. Changes and cancellations
-after publication, attendance and reminders belong to later stories.
+Admins post targets to `…/interview-days/{day_id}/cancellation-preview`, then
+submit the same target, preview token and student-visible reason to `…/cancel`.
+Targets are an individual published appointment, an exact availability period,
+or the day. The server rejects a stale preview. A period cancellation removes
+that period and cancels its published appointments. Day-only selections can
+wait for added hours. Cancelling the full day releases both unpublished
+selections and affected appointments, and requires students to choose another
+day. Audit history keeps actor, scope, reason and original appointment times.
+The application stays open for interview booking. Admins use
+`PUT …/interview-days/{day_id}/appointments/{selection_id}/attendance` to record
+`attended` or `no_show` once the confirmed appointment has ended.
+
+The Student Calendar opens Interview Calendar, which loads each current
+appointment or terminal booking status from `GET /api/v1/me/interview-appointments`.
+`GET /api/v1/me/interview-notices` lists confirmations, cancellations and new-day
+notices. Flutter opens the current booking from an entry or notice, even when
+the notice describes a past state. Notices are stored in the same transaction
+as the action that created them. Unpublished schedule previews stay private
+to the club administrator.
 
 Migration `0009_membership_applications` adds membership records after `0008`.
 Migration `0010_interview_booking` adds days, preserved day selection history,
 and confirmed times. Club row locks serialize day selections and capacity
 edits. An advisory transaction lock serializes publication across clubs to
 prevent one applicant from receiving overlapping appointments.
+
+Migration `0011_interview_lifecycle` adds expiry and attendance fields,
+cancellation audit records, and durable student notices. It backfills
+confirmation notices for appointments published under `0010`. Its downgrade
+refuses to discard recorded cancellation, expiry or attendance history.
+
+CAMP-56 archive status and archive reasons depend on the separate club
+lifecycle work. The current admin routes require an approved, active club.

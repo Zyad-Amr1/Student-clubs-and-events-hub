@@ -65,4 +65,53 @@ extension InterviewApi on CampusApi {
 
   Future<JsonObject> interviewAppointments(String token) =>
       _request('GET', '/api/v1/me/interview-appointments', token: token);
+
+  Future<JsonObject> interviewNotices(String token) =>
+      _request('GET', '/api/v1/me/interview-notices', token: token);
+
+  String _interviewDay(String club, String day) =>
+      '${_adminDays(club)}/${Uri.encodeComponent(day)}';
+
+  Future<JsonObject> previewInterviewCancellation(
+    String token,
+    String club,
+    String day,
+    JsonObject target,
+  ) => _request(
+    'POST',
+    '${_interviewDay(club, day)}/cancellation-preview',
+    token: token,
+    body: target,
+  );
+
+  Future<void> cancelInterview(
+    String token,
+    String club,
+    String day,
+    JsonObject target,
+    String previewToken,
+    String reason,
+  ) async {
+    await _request(
+      'POST',
+      '${_interviewDay(club, day)}/cancel',
+      token: token,
+      body: {'target': target, 'preview_token': previewToken, 'reason': reason},
+    );
+  }
+
+  Future<void> recordInterviewAttendance(
+    String token,
+    String club,
+    String day,
+    String selection,
+    String status,
+  ) async {
+    await _request(
+      'PUT',
+      '${_interviewDay(club, day)}/appointments/${Uri.encodeComponent(selection)}/attendance',
+      token: token,
+      body: {'status': status},
+    );
+  }
 }

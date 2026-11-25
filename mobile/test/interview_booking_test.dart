@@ -39,7 +39,7 @@ void main() {
                 ? {
                     'day_id': 'day-1',
                     'day': date,
-                    'status': published ? 'confirmed' : 'day_selected',
+                    'status': published ? 'confirmed' : 'unscheduled',
                     'starts_at': published ? '${date}T09:00:00Z' : null,
                     'ends_at': published ? '${date}T09:20:00Z' : null,
                   }
@@ -48,7 +48,7 @@ void main() {
         case ('PUT', path):
           expect(jsonDecode(request.body!), {'day_id': 'day-1'});
           selected = true;
-          return ok({'status': 'day_selected'});
+          return ok({'status': 'unscheduled'});
         default:
           fail(
             'Unexpected interview call ${request.method} ${request.uri.path}',
