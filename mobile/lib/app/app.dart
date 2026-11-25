@@ -1,4 +1,5 @@
 import 'package:campusconnect/app/routes.dart';
+import 'package:campusconnect/app/student_home.dart';
 import 'package:campusconnect/app/theme.dart';
 import 'package:campusconnect/app/welcome_screen.dart';
 import 'package:campusconnect/core/api_client.dart';
@@ -111,7 +112,7 @@ class _HomeGate extends StatelessWidget {
     }
     if (!session.signedIn) return const WelcomeScreen();
     return switch (session.portal) {
-      PortalRole.student => const ClubsScreen(),
+      PortalRole.student => const StudentHome(),
       PortalRole.clubAdmin => const RoleHomeScreen(
         portal: PortalRole.clubAdmin,
       ),

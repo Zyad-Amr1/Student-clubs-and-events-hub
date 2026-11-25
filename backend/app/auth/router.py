@@ -148,19 +148,31 @@ def get_managed_clubs(
     if identity.user.account_type != AccountType.STUDENT:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    clubs = db.scalars(
+    clubs = _active_managed_clubs(db, identity.user.id)
+    if not clubs:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return {"clubs": clubs}
+
+
+@router.get("/me/managed-clubs", response_model=ManagedClubsResponse)
+def my_managed_clubs(
+    identity: AuthenticatedIdentity = Depends(require_roles(AccountType.STUDENT)),
+    db: Session = Depends(get_db),
+) -> dict:
+    return {"clubs": _active_managed_clubs(db, identity.user.id)}
+
+
+def _active_managed_clubs(db: Session, user_id: UUID):
+    return db.scalars(
         select(Club)
         .join(ClubAdministrator, ClubAdministrator.club_id == Club.id)
         .where(
-            ClubAdministrator.user_id == identity.user.id,
+            ClubAdministrator.user_id == user_id,
             Club.is_active.is_(True),
             Club.approval_status == ClubApprovalStatus.APPROVED,
         )
         .order_by(Club.name.asc(), Club.id.asc())
     ).all()
-    if not clubs:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
-    return {"clubs": clubs}
 
 
 @router.put(

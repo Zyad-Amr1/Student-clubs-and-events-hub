@@ -86,6 +86,10 @@ class StudentProfile {
     required this.email,
     required this.universityId,
     required this.accountType,
+    this.faculty,
+    this.department,
+    this.academicYear,
+    this.picture,
   });
 
   final String id;
@@ -93,6 +97,10 @@ class StudentProfile {
   final String email;
   final String universityId;
   final String accountType;
+  final String? faculty;
+  final String? department;
+  final int? academicYear;
+  final String? picture;
 
   factory StudentProfile.fromJson(JsonObject json) => StudentProfile(
     id: json['id'] as String,
@@ -100,6 +108,10 @@ class StudentProfile {
     email: json['email'] as String,
     universityId: json['university_id'] as String,
     accountType: json['account_type'] as String,
+    faculty: json['faculty'] as String?,
+    department: json['department'] as String?,
+    academicYear: json['academic_year'] as int?,
+    picture: json['profile_picture_url'] as String?,
   );
 }
 
@@ -124,6 +136,48 @@ class CampusClub {
     description: json['description'] as String,
     category: json['category'] as String,
     logoUrl: json['logo_url'] as String?,
+  );
+}
+
+class ClubCreationRequest {
+  const ClubCreationRequest({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.category,
+    required this.logoUrl,
+    required this.status,
+    required this.rejectionReason,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final String description;
+  final String category;
+  final String? logoUrl;
+  final String status;
+  final String? rejectionReason;
+  final DateTime createdAt;
+
+  bool get pending => status == 'pending';
+  String get statusLabel => switch (status) {
+    'pending' => 'Pending',
+    'approved' => 'Approved',
+    'rejected' => 'Rejected',
+    'withdrawn' => 'Withdrawn',
+    _ => 'Unknown',
+  };
+
+  factory ClubCreationRequest.fromJson(JsonObject json) => ClubCreationRequest(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    description: json['description'] as String,
+    category: json['category'] as String,
+    logoUrl: json['logo_url'] as String?,
+    status: json['status'] as String,
+    rejectionReason: json['rejection_reason'] as String?,
+    createdAt: DateTime.parse(json['created_at'] as String),
   );
 }
 
@@ -410,6 +464,35 @@ class CampusApi {
     await _request('GET', '/api/v1/auth/me', token: token),
   );
 
+  Future<StudentProfile> updateProfile(String token, JsonObject data) async =>
+      StudentProfile.fromJson(
+        await _request('PUT', '/api/v1/auth/me', token: token, body: data),
+      );
+
+  Future<JsonObject> academicCatalog(String token) =>
+      _request('GET', '/api/v1/auth/academic-catalog', token: token);
+
+  Future<void> changePassword(String token, JsonObject data) async {
+    await _request(
+      'POST',
+      '/api/v1/auth/me/password',
+      token: token,
+      body: data,
+    );
+  }
+
+  Future<List<ManagedClub>> myManagedClubs(String token) async {
+    final data = await _request(
+      'GET',
+      '/api/v1/auth/me/managed-clubs',
+      token: token,
+    );
+    return (data['clubs'] as List)
+        .cast<JsonObject>()
+        .map(ManagedClub.fromJson)
+        .toList();
+  }
+
   Future<List<ManagedClub>> managedClubs(String token) async {
     final json = await _request(
       'GET',
@@ -545,6 +628,94 @@ class CampusApi {
       query: {'page': '$page', 'page_size': '20'},
     );
     return ClubPage.fromJson(json);
+  }
+
+  static const _myClubRequests = '/api/v1/me/club-requests';
+  static const _reviewClubRequests = '/api/v1/student-affairs/club-requests';
+
+  Future<({List<ClubCreationRequest> requests, bool hasMore})> clubRequests(
+    String token, {
+    required bool review,
+    required int page,
+  }) async {
+    final json = await _request(
+      'GET',
+      review ? _reviewClubRequests : _myClubRequests,
+      token: token,
+      query: {'page': '$page'},
+    );
+    return (
+      requests: (json['requests'] as List)
+          .cast<JsonObject>()
+          .map(ClubCreationRequest.fromJson)
+          .toList(),
+      hasMore: json['has_more'] as bool,
+    );
+  }
+
+  Future<void> saveClubRequest(
+    String token,
+    JsonObject data, {
+    String? id,
+  }) async {
+    await _request(
+      id == null ? 'POST' : 'PUT',
+      id == null
+          ? _myClubRequests
+          : '$_myClubRequests/${Uri.encodeComponent(id)}',
+      token: token,
+      body: data,
+    );
+  }
+
+  Future<void> withdrawClubRequest(String token, String id) async {
+    await _request(
+      'POST',
+      '$_myClubRequests/${Uri.encodeComponent(id)}/withdraw',
+      token: token,
+    );
+  }
+
+  Future<List<CampusClub>> similarClubs(String token, String id) async {
+    final json = await _request(
+      'GET',
+      '$_reviewClubRequests/${Uri.encodeComponent(id)}/similar',
+      token: token,
+    );
+    return (json['clubs'] as List)
+        .cast<JsonObject>()
+        .map(CampusClub.fromJson)
+        .toList();
+  }
+
+  Future<void> decideClubRequest(
+    String token,
+    String id,
+    String decision, {
+    String? reason,
+  }) async {
+    await _request(
+      'POST',
+      '$_reviewClubRequests/${Uri.encodeComponent(id)}/decision',
+      token: token,
+      body: {'decision': decision, 'reason': ?reason},
+    );
+  }
+
+  String _managedClubPath(String id) =>
+      '/api/v1/club-admin/clubs/${Uri.encodeComponent(id)}/profile';
+
+  Future<CampusClub> managedClubProfile(String token, String id) async =>
+      CampusClub.fromJson(
+        await _request('GET', _managedClubPath(id), token: token),
+      );
+
+  Future<void> updateManagedClub(
+    String token,
+    String id,
+    JsonObject data,
+  ) async {
+    await _request('PUT', _managedClubPath(id), token: token, body: data);
   }
 
   Future<ClubDetails> clubDetails(

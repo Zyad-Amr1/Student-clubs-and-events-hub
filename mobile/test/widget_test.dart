@@ -180,7 +180,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-profile')));
     await tester.pumpAndSettle();
     expect(find.text('Student User'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('profile-logout')));
+    final logout = find.byKey(const ValueKey('profile-logout'));
+    await tester.scrollUntilVisible(logout, 160);
+    await tester.pumpAndSettle();
+    await tester.tap(logout);
     await tester.pumpAndSettle();
     expect(store.token, isNull);
     expect(backend.paths, contains('/api/v1/auth/logout'));

@@ -92,6 +92,10 @@ class AuthenticatedUser(BaseModel):
     account_type: Literal["student", "student_affairs"]
     is_active: bool
     created_at: datetime
+    faculty: str | None = None
+    department: str | None = None
+    academic_year: int | None = None
+    profile_picture_url: str | None = None
 
 
 class ManagedClub(BaseModel):
