@@ -178,6 +178,9 @@ def test_registration_creates_only_student_without_returning_secrets(registratio
     with Session(migrated_engine) as session:
         stored = session.query(User).filter_by(email="student@example.edu").one()
         assert stored.account_type is AccountType.STUDENT
+        assert stored.faculty is None
+        assert stored.department is None
+        assert stored.academic_year is None
         assert stored.password_hash != "StrongPassphrase#123"
         assert verify_password("StrongPassphrase#123", stored.password_hash)
 
