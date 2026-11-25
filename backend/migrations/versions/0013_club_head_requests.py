@@ -41,6 +41,40 @@ def upgrade():
                     postgresql_where=sa.text("status = 'pending'"))
 
 
+    # Both write paths lock the club before checking the opposite table.
+    op.execute("""
+        CREATE FUNCTION campusconnect_guard_club_head() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            IF TG_TABLE_NAME = 'club_head_requests' THEN
+                IF NEW.status <> 'pending' THEN
+                    RETURN NEW;
+                END IF;
+            END IF;
+            PERFORM 1 FROM clubs WHERE id = NEW.club_id FOR UPDATE;
+            IF TG_TABLE_NAME = 'club_head_requests' THEN
+                IF EXISTS (SELECT 1 FROM club_administrators WHERE club_id = NEW.club_id) THEN
+                    RAISE EXCEPTION 'Club already has an assigned Head' USING ERRCODE = '23514';
+                END IF;
+            ELSIF EXISTS (
+                SELECT 1 FROM club_head_requests WHERE club_id = NEW.club_id AND status = 'pending'
+            ) THEN
+                RAISE EXCEPTION 'Club has a pending Head application' USING ERRCODE = '23514';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+        CREATE TRIGGER guard_pending_club_head BEFORE INSERT OR UPDATE ON club_head_requests
+        FOR EACH ROW EXECUTE FUNCTION campusconnect_guard_club_head();
+        CREATE TRIGGER guard_assigned_club_head BEFORE INSERT OR UPDATE ON club_administrators
+        FOR EACH ROW EXECUTE FUNCTION campusconnect_guard_club_head();
+    """)
+
+
+
 def downgrade():
+    op.execute("DROP TRIGGER guard_assigned_club_head ON club_administrators")
+    op.execute("DROP TRIGGER guard_pending_club_head ON club_head_requests")
+    op.execute("DROP FUNCTION campusconnect_guard_club_head()")
     op.drop_table("club_head_requests")
     op.drop_index("uq_users_student_affairs", table_name="users")

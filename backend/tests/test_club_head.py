@@ -42,6 +42,9 @@ def test_club_head_race_rejection_reopening_and_assignment(draft_client, draft_t
     assert draft_client.get(queue, headers=headers[winner]).status_code == 403
     rows = draft_client.get(queue, headers=headers["affairs"]).json()["requests"]
     assert len(rows) == 1 and rows[0]["applicant_name"]
+    with pytest.raises(IntegrityError), draft_test_engine.begin() as db:
+        db.execute(text("INSERT INTO club_administrators (club_id, user_id) VALUES (:club, :student)"),
+                   {"club": club, "student": scenario["ids"][loser]})
     review = f"{queue}/{rows[0]['id']}/decision"
     assert draft_client.post(review, headers=headers[winner], json={"decision": "approve"}).status_code == 403
     assert draft_client.post(review, headers=headers["affairs"], json={"decision": "reject"}).status_code == 422
@@ -58,5 +61,8 @@ def test_club_head_race_rejection_reopening_and_assignment(draft_client, draft_t
     assert draft_client.post(path, headers=headers["affairs"], json={"decision": "approve"}).status_code == 409
     assert draft_client.get(vacancy, headers=headers[winner]).json()["availability"] == "assigned"
     assert draft_client.post(apply, headers=headers[winner]).status_code == 409
+    with pytest.raises(IntegrityError), draft_test_engine.begin() as db:
+        db.execute(text("INSERT INTO club_head_requests (club_id, student_id) VALUES (:club, :student)"),
+                   {"club": club, "student": scenario["ids"][winner]})
     assert draft_client.get("/api/v1/auth/me/managed-clubs", headers=headers[loser]).json()["clubs"][0]["id"] == str(club)
     assert draft_client.get("/api/v1/auth/me", headers=headers[loser]).json()["account_type"] == "student"

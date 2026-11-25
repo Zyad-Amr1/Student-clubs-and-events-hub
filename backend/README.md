@@ -294,7 +294,7 @@ and refuses password entry when echo cannot be suppressed. It validates the
 same fields as registration, hashes with scrypt, and creates a new Student
 Affairs account. An existing email or University ID is rejected without
 changing the existing account. Public registration continues to create only
-Students. CAMP-63 provisioning uses the existing schema and adds no migration.
+Students. Migration `0013_club_head_requests` enforces the Student Affairs singleton.
 
 ## Club browsing API
 
@@ -581,7 +581,8 @@ same Flutter sign-in screen as Students.
   `assigned` for an active, approved club.
 - `POST /api/v1/clubs/{club_id}/head-requests` submits the caller's application.
   The club row serializes applications and assignment and PostgreSQL enforces
-  one pending application and one administrator grant per club.
+  one pending application and one administrator grant per club. Database triggers
+  also prevent a pending request and an active grant from coexisting.
 - `GET /api/v1/me/club-head-requests` returns the current Student's history.
 - `GET /api/v1/student-affairs/club-head-requests` lists pending requests.
 - `POST /api/v1/student-affairs/club-head-requests/{id}/decision` accepts an

@@ -118,13 +118,15 @@ def decide(request_id: UUID, data: Decision, identity: Affairs, db: DB):
             raise HTTPException(409, "The applicant is no longer an active Student.")
         if _has_head(db, club_id):
             raise HTTPException(409, "This club already has a Club Head.")
-        db.add(ClubAdministrator(club_id=club_id, user_id=applicant.id))
     request.status = "approved" if data.decision == "approve" else "rejected"
     request.reason = data.reason
     request.decided_at = utcnow()
     request.reviewed_by = identity.user.id
     result = _view(request, club.name, applicant.full_name)
     try:
+        if data.decision == "approve":
+            db.flush()  # Clear the pending state before the database accepts a grant.
+            db.add(ClubAdministrator(club_id=club_id, user_id=applicant.id))
         db.commit()
     except IntegrityError:
         db.rollback()
