@@ -56,6 +56,7 @@ def draft_test_engine():
                     assert not inspect(connection).has_table("clubs")
                     assert not inspect(connection).has_table("events")
                     assert not inspect(connection).has_table("club_administrators")
+                    assert not inspect(connection).has_table("event_reservations")
                     connection.execute(text("DROP TABLE alembic_version"))
     finally:
         engine.dispose()

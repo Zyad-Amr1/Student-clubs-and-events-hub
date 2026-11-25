@@ -9,6 +9,7 @@ from app.models.auth_session import AuthSession  # register table with shared Ba
 from app.models.club import Club  # register table with shared Base metadata
 from app.models.club_administrator import ClubAdministrator  # club-scoped access grants
 from app.models.event import Event  # register table with shared Base metadata
+from app.models.event_reservation import EventReservation  # student event reservations
 from app.models.user import User
 
 
