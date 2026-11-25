@@ -1,12 +1,12 @@
 import 'package:campusconnect/app/app.dart';
 import 'package:campusconnect/core/api_client.dart';
-import 'package:campusconnect/core/portal_role.dart';
+import 'package:campusconnect/app/design.dart';
 import 'package:material_ui/material_ui.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, this.portal = PortalRole.student});
+  const AuthScreen({super.key, this.initialRegistration = false});
 
-  final PortalRole portal;
+  final bool initialRegistration;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -20,7 +20,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
 
-  bool _register = false;
+  late bool _register = widget.initialRegistration;
   bool _submitting = false;
   String? _error;
 
@@ -45,7 +45,7 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     final session = StudentSessionScope.of(context);
     try {
-      if (_register && widget.portal == PortalRole.student) {
+      if (_register) {
         await session.registerAndSignIn(
           fullName: _name.text,
           email: _email.text,
@@ -54,11 +54,7 @@ class _AuthScreenState extends State<AuthScreen> {
           confirmPassword: _confirmation.text,
         );
       } else {
-        await session.signIn(
-          _email.text,
-          _password.text,
-          portal: widget.portal,
-        );
+        await session.signIn(_email.text, _password.text);
       }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -76,9 +72,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
-        _register ? 'Create student account' : widget.portal.loginTitle,
-      ),
+      title: Text(_register ? 'Create student account' : 'Sign in'),
     ),
     body: SafeArea(
       child: Center(
@@ -91,20 +85,19 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
+                  CampusHeader(
                     _register ? 'Join CampusConnect' : 'Welcome back',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    _register
+                        ? 'Create an account with your university details.'
+                        : 'Sign in with your campus account.',
                   ),
                   const SizedBox(height: 20),
-                  if (_register && widget.portal == PortalRole.student) ...[
+                  if (_register) ...[
                     TextFormField(
                       key: const ValueKey('register-name'),
                       controller: _name,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Full name',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Full name'),
                       validator: (value) {
                         final required = _required(value);
                         if (required != null) return required;
@@ -122,7 +115,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     autofillHints: const [AutofillHints.email],
                     decoration: const InputDecoration(
                       labelText: 'University email',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       final required = _required(value);
@@ -133,13 +125,12 @@ class _AuthScreenState extends State<AuthScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  if (_register && widget.portal == PortalRole.student) ...[
+                  if (_register) ...[
                     TextFormField(
                       key: const ValueKey('register-university-id'),
                       controller: _universityId,
                       decoration: const InputDecoration(
                         labelText: 'University ID',
-                        border: OutlineInputBorder(),
                       ),
                       validator: _required,
                     ),
@@ -150,10 +141,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _password,
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Password'),
                     validator: (value) {
                       final required = _required(value);
                       if (required != null) return required;
@@ -163,7 +151,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       return null;
                     },
                   ),
-                  if (_register && widget.portal == PortalRole.student) ...[
+                  if (_register) ...[
                     const SizedBox(height: 12),
                     TextFormField(
                       key: const ValueKey('register-confirm-password'),
@@ -171,7 +159,6 @@ class _AuthScreenState extends State<AuthScreen> {
                       obscureText: true,
                       decoration: const InputDecoration(
                         labelText: 'Confirm password',
-                        border: OutlineInputBorder(),
                       ),
                       validator: (value) {
                         if (value != _password.text) {
@@ -204,22 +191,21 @@ class _AuthScreenState extends State<AuthScreen> {
                         : Text(_register ? 'Register and sign in' : 'Sign in'),
                   ),
                   const SizedBox(height: 10),
-                  if (widget.portal == PortalRole.student)
-                    TextButton(
-                      key: const ValueKey('auth-toggle'),
-                      onPressed: _submitting
-                          ? null
-                          : () => setState(() {
-                              _register = !_register;
-                              _error = null;
-                              _formKey.currentState?.reset();
-                            }),
-                      child: Text(
-                        _register
-                            ? 'Already have an account? Sign in'
-                            : 'New student? Create an account',
-                      ),
+                  TextButton(
+                    key: const ValueKey('auth-toggle'),
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() {
+                            _register = !_register;
+                            _error = null;
+                            _formKey.currentState?.reset();
+                          }),
+                    child: Text(
+                      _register
+                          ? 'Already have an account? Sign in'
+                          : 'New student? Create an account',
                     ),
+                  ),
                 ],
               ),
             ),

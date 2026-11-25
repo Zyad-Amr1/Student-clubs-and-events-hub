@@ -70,10 +70,8 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
     routes: {
       AppRoutes.home: (context) => const _HomeGate(),
       AppRoutes.authentication: (context) => const AuthScreen(),
-      AppRoutes.clubAdminLogin: (context) =>
-          const AuthScreen(portal: PortalRole.clubAdmin),
-      AppRoutes.studentAffairsLogin: (context) =>
-          const AuthScreen(portal: PortalRole.studentAffairs),
+      AppRoutes.registration: (context) =>
+          const AuthScreen(initialRegistration: true),
       AppRoutes.clubs: (context) => const ClubsScreen(),
       AppRoutes.profile: (context) => const ProfileScreen(),
     },
