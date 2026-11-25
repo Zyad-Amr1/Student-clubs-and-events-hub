@@ -99,3 +99,5 @@ class Event(Base):
         server_default=func.now(),
         server_onupdate=FetchedValue(),
     )
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancellation_reason: Mapped[str | None] = mapped_column(Text)

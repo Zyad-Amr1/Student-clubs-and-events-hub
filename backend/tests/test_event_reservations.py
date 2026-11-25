@@ -358,6 +358,8 @@ def test_reservation_list_is_current_student_scoped_and_contains_event_details(
         "starts_at": published_event["starts_at"],
         "ends_at": published_event["ends_at"],
         "seat_capacity": published_event["seat_capacity"],
+        "cancelled_at": None,
+        "cancellation_reason": None,
     }
     owner_result = draft_client.get(
         "/api/v1/me/reservations", headers=scenario["headers"]["owner"]

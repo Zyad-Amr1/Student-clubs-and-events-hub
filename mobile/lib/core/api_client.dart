@@ -193,6 +193,8 @@ class CampusEvent {
     required this.startsAt,
     required this.seatCapacity,
     this.endsAt,
+    this.cancelledAt,
+    this.cancellationReason,
   });
 
   final String id;
@@ -202,6 +204,8 @@ class CampusEvent {
   final DateTime startsAt;
   final DateTime? endsAt;
   final int seatCapacity;
+  final DateTime? cancelledAt;
+  final String? cancellationReason;
 
   factory CampusEvent.fromJson(JsonObject json) => CampusEvent(
     id: json['id'] as String,
@@ -213,10 +217,14 @@ class CampusEvent {
         ? null
         : DateTime.parse(json['ends_at'] as String),
     seatCapacity: json['seat_capacity'] as int,
+    cancelledAt: json['cancelled_at'] == null
+        ? null
+        : DateTime.parse(json['cancelled_at'] as String),
+    cancellationReason: json['cancellation_reason'] as String?,
   );
 }
 
-enum ReservationStatus { confirmed, waitlisted }
+enum ReservationStatus { confirmed, waitlisted, cancelled }
 
 class EventReservation {
   const EventReservation({
@@ -295,13 +303,24 @@ class ClubDetails {
 }
 
 class ManagedClub {
-  const ManagedClub({required this.id, required this.name});
+  const ManagedClub({
+    required this.id,
+    required this.name,
+    this.isActive = true,
+    this.archiveReason,
+  });
 
   final String id;
   final String name;
+  final bool isActive;
+  final String? archiveReason;
 
-  factory ManagedClub.fromJson(JsonObject json) =>
-      ManagedClub(id: json['id'] as String, name: json['name'] as String);
+  factory ManagedClub.fromJson(JsonObject json) => ManagedClub(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    isActive: json['is_active'] as bool? ?? true,
+    archiveReason: json['archive_reason'] as String?,
+  );
 }
 
 class ManagedEvent {
@@ -730,6 +749,50 @@ class CampusApi {
   ) async {
     await _request('PUT', _managedClubPath(id), token: token, body: data);
   }
+
+  Future<JsonObject> lifecycleClubs(String token) =>
+      _request('GET', '/api/v1/student-affairs/clubs', token: token);
+
+  Future<JsonObject> archivePreview(String token, String clubId) => _request(
+    'POST',
+    '/api/v1/student-affairs/clubs/${Uri.encodeComponent(clubId)}/archive-preview',
+    token: token,
+  );
+
+  Future<JsonObject> archiveClub(
+    String token,
+    String clubId,
+    String reason,
+    String previewToken,
+  ) => _request(
+    'POST',
+    '/api/v1/student-affairs/clubs/${Uri.encodeComponent(clubId)}/archive',
+    token: token,
+    body: {'reason': reason, 'preview_token': previewToken},
+  );
+
+  Future<JsonObject> reactivateClub(
+    String token,
+    String clubId, {
+    String? reason,
+  }) => _request(
+    'POST',
+    '/api/v1/student-affairs/clubs/${Uri.encodeComponent(clubId)}/reactivate',
+    token: token,
+    body: {'reason': ?reason},
+  );
+
+  Future<JsonObject> clubLifecycleHistory(
+    String token,
+    String clubId,
+  ) => _request(
+    'GET',
+    '/api/v1/student-affairs/clubs/${Uri.encodeComponent(clubId)}/lifecycle-history',
+    token: token,
+  );
+
+  Future<JsonObject> clubLifecycleNotices(String token) =>
+      _request('GET', '/api/v1/me/club-lifecycle-notices', token: token);
 
   Future<ClubDetails> clubDetails(
     String token,

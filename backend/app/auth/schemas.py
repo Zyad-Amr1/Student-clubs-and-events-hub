@@ -104,6 +104,8 @@ class ManagedClub(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    is_active: bool = True
+    archive_reason: str | None = None
 
 
 class ManagedClubsResponse(BaseModel):

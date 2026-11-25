@@ -177,3 +177,37 @@ def test_cancellation_scopes_audit_and_selection_race(
     with draft_test_engine.connect() as conn:
         assert conn.scalar(text("SELECT count(*) FROM interview_cancellations")) == 3
         assert conn.scalar(text("SELECT count(*) FROM interview_selections WHERE released_at IS NULL")) == 0
+
+
+def test_archiving_club_cancels_interviews_without_rejecting_applications(
+    draft_client, draft_test_engine, scenario,
+):
+    client = draft_client
+    club, admin, owner = setup_club(draft_test_engine, scenario)
+    student = scenario["headers"]["student"]
+    application_path = eligible(client, club, admin, owner, student)
+    date = datetime.now(timezone.utc).date() + timedelta(days=2)
+    day, _ = setup_day(client, admin, owner, date, [(600, 620)])
+    assert choose(client, application_path, student, day).json()["status"] == "unscheduled"
+    day_path = f"{admin}/interview-days/{day}"
+    appointments = confirm(client, day_path, owner)
+    assert len(appointments) == 1
+
+    club_path = f"/api/v1/student-affairs/clubs/{club}"
+    preview = client.post(club_path + "/archive-preview", headers=scenario["headers"]["affairs"])
+    assert preview.status_code == 200
+    assert preview.json()["interview_days"][0]["students"] == 1
+    archived = client.post(club_path + "/archive", headers=scenario["headers"]["affairs"], json={
+        "reason": "Building closed", "preview_token": preview.json()["preview_token"],
+    })
+    assert archived.status_code == 200, archived.text
+    calendar = client.get("/api/v1/me/interview-appointments", headers=student).json()["appointments"]
+    assert calendar[0]["status"] == "cancelled"
+    assert calendar[0]["cancellation_reason"] == "Building closed"
+    app_state = client.get("/api/v1/me/applications", headers=student).json()["applications"][0]
+    assert app_state["status"] == "interview_required"
+    attendance = client.put(
+        f"{day_path}/appointments/{appointments[0]['selection_id']}/attendance",
+        headers=owner, json={"status": "no_show"},
+    )
+    assert attendance.status_code == 404

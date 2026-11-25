@@ -7,6 +7,7 @@ import 'package:campusconnect/features/clubs/presentation/club_management_form.d
 import 'package:campusconnect/features/clubs/presentation/club_requests_screen.dart';
 import 'package:campusconnect/features/clubs/presentation/membership_screen.dart';
 import 'package:campusconnect/features/clubs/presentation/interview_screens.dart';
+import 'package:campusconnect/features/clubs/presentation/club_lifecycle_screen.dart';
 import 'package:campusconnect/features/events/presentation/create_event_screen.dart';
 import 'package:campusconnect/features/events/presentation/review_events_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -136,40 +137,49 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                         key: ValueKey('managed-club-${club.id}'),
                         leading: const Icon(Icons.groups_outlined),
                         title: Text(club.name),
-                        subtitle: const Text(
-                          'Create and submit events for review',
+                        subtitle: Text(
+                          club.isActive
+                              ? 'Create and submit events for review'
+                              : 'Archived: ${club.archiveReason ?? 'No reason recorded'}',
                         ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CreateEventScreen(club: club),
-                          ),
-                        ),
+                        trailing: club.isActive
+                            ? const Icon(Icons.chevron_right)
+                            : const Icon(Icons.archive_outlined),
+                        onTap: club.isActive
+                            ? () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => CreateEventScreen(club: club),
+                                ),
+                              )
+                            : null,
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => ManagedClubProfileScreen(club.id),
+                      if (club.isActive)
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => ManagedClubProfileScreen(club.id),
+                            ),
                           ),
+                          child: const Text('Edit Club Profile'),
                         ),
-                        child: const Text('Edit Club Profile'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => MembershipScreen(club: club),
+                      if (club.isActive)
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => MembershipScreen(club: club),
+                            ),
                           ),
+                          child: const Text('Membership Applications'),
                         ),
-                        child: const Text('Membership Applications'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => AdminInterviewDaysScreen(club),
+                      if (club.isActive)
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => AdminInterviewDaysScreen(club),
+                            ),
                           ),
+                          child: const Text('Interview Days'),
                         ),
-                        child: const Text('Interview Days'),
-                      ),
                     ],
                   ),
                 ),
@@ -200,6 +210,14 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                   ),
                 ),
                 child: const Text('Review Club Requests'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ClubLifecycleScreen(),
+                  ),
+                ),
+                child: const Text('Manage Club Lifecycle'),
               ),
             ],
             if (_error != null) ...[

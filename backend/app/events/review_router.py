@@ -75,19 +75,19 @@ def review_pending_event(
     decision: EventReviewDecision,
     db: Annotated[Session, Depends(get_db)],
 ) -> Event:
-    # Lock the Club and Event rows consistently with draft submission.
-    # The second concurrent decision observes the first committed state.
-    event = db.scalar(
-        select(Event)
-        .join(Club, Event.club_id == Club.id)
-        .where(
-            Event.id == event_id,
-            Club.is_active.is_(True),
-            Club.approval_status == ClubApprovalStatus.APPROVED,
-        )
-        .with_for_update(of=(Club, Event))
-    )
-    if event is None:
+    club_id = db.scalar(select(Event.club_id).where(Event.id == event_id))
+    if club_id is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    # Archive and all club-scoped activity acquire Club before Event.
+    club = db.scalar(select(Club).where(
+        Club.id == club_id,
+        Club.is_active.is_(True),
+        Club.approval_status == ClubApprovalStatus.APPROVED,
+    ).with_for_update())
+    if club is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    event = db.scalar(select(Event).where(Event.id == event_id).with_for_update())
+    if event is None or event.club_id != club.id:
         raise HTTPException(status_code=404, detail="Event not found")
     if event.approval_status != EventApprovalStatus.PENDING or event.is_published:
         raise HTTPException(status_code=409, detail="Event is not pending")

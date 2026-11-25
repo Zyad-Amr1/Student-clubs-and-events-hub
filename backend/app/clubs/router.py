@@ -134,6 +134,7 @@ def get_club_details(
         Event.club_id == club.id,
         Event.approval_status == EventApprovalStatus.APPROVED,
         Event.is_published.is_(True),
+        Event.cancelled_at.is_(None),
         Event.starts_at > now,
     )
     event_query = select(Event).join(Club, Event.club_id == Club.id).where(*visible_events)

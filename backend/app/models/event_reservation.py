@@ -27,7 +27,7 @@ class EventReservation(Base):
     __tablename__ = "event_reservations"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('confirmed', 'waitlisted')",
+            "status IN ('confirmed', 'waitlisted', 'cancelled')",
             name="ck_event_reservations_status",
         ),
         UniqueConstraint(

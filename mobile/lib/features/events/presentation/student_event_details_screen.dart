@@ -8,6 +8,7 @@ String reservationLabel(EventReservation reservation) =>
       ReservationStatus.confirmed => 'Confirmed',
       ReservationStatus.waitlisted =>
         'Waitlisted · position ${reservation.waitlistPosition}',
+      ReservationStatus.cancelled => 'Cancelled',
     };
 
 String eventTime(BuildContext context, DateTime value) {
@@ -144,6 +145,10 @@ class _StudentEventDetailsScreenState extends State<StudentEventDetailsScreen> {
             if (event.endsAt case final end?)
               Text('Ends: ${eventTime(context, end)}'),
             Text('Capacity: ${event.seatCapacity}'),
+            if (event.cancelledAt != null)
+              Text(
+                'Cancelled: ${event.cancellationReason ?? 'No reason provided'}',
+              ),
             const SizedBox(height: 24),
             if (_busy)
               const LinearProgressIndicator()
@@ -157,10 +162,11 @@ class _StudentEventDetailsScreenState extends State<StudentEventDetailsScreen> {
               if (reservation != null) ...[
                 Text(reservationLabel(reservation)),
                 const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _confirmCancellation,
-                  child: const Text('Cancel reservation'),
-                ),
+                if (reservation.status != ReservationStatus.cancelled)
+                  OutlinedButton(
+                    onPressed: _confirmCancellation,
+                    child: const Text('Cancel reservation'),
+                  ),
               ] else if (hasStarted)
                 const Text(
                   'Reservations are closed because the event has started.',

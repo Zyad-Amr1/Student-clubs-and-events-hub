@@ -143,7 +143,8 @@ def get_managed_clubs(
     """Resolve current club-scoped privileges from the database on every request.
 
     This is not a role-granting endpoint. Portal selection and JWT claims
-    cannot confer a membership. No inactive clubs are exposed.
+    cannot confer a membership. Archived clubs stay visible read-only to
+    their assigned admin so lifecycle status and reason remain accessible.
     """
     if identity.user.account_type != AccountType.STUDENT:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
@@ -168,7 +169,7 @@ def _active_managed_clubs(db: Session, user_id: UUID):
         .join(ClubAdministrator, ClubAdministrator.club_id == Club.id)
         .where(
             ClubAdministrator.user_id == user_id,
-            Club.is_active.is_(True),
+            (Club.is_active.is_(True) | Club.archived_at.is_not(None)),
             Club.approval_status == ClubApprovalStatus.APPROVED,
         )
         .order_by(Club.name.asc(), Club.id.asc())
