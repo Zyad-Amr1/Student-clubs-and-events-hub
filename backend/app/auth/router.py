@@ -1,10 +1,11 @@
 """Public registration and login, authenticated profiles, and account-type checks."""
 
 from typing import Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.accounts import DuplicateAccountError, create_account
@@ -15,6 +16,7 @@ from app.config import AuthenticationConfigurationError
 from app.auth.schemas import (
     AuthenticatedUser, LoginRequest, RegisteredStudent,
     StudentRegistrationRequest, TokenResponse, ManagedClubsResponse,
+    ClubAdministratorAssignment, ClubAdministratorAssignmentResponse,
 )
 from app.database import get_db
 from app.models.auth_session import AuthSession
@@ -145,3 +147,75 @@ def get_managed_clubs(
     if not clubs:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return {"clubs": clubs}
+
+
+@router.put(
+    "/student-affairs/clubs/{club_id}/administrator",
+    response_model=ClubAdministratorAssignmentResponse,
+    dependencies=[Depends(require_roles(AccountType.STUDENT_AFFAIRS))],
+    responses={
+        401: {"description": "Invalid or revoked JWT"},
+        403: {"description": "Student Affairs role required"},
+        404: {"description": "Club not found or inactive"},
+        409: {"description": "Concurrent assignment conflict; retry"},
+        422: {"description": "Target must be an active Student account"},
+    },
+)
+def assign_club_administrator(
+    club_id: UUID,
+    data: ClubAdministratorAssignment,
+    db: Session = Depends(get_db),
+) -> ClubAdministratorAssignmentResponse:
+    """Student Affairs replaces the sole admin under a per-club row lock.
+
+    External verification of the student's eligibility is a trusted
+    Student Affairs workflow prerequisite, not a client-selected role.
+    This operation never creates accounts or modifies Student privileges.
+    """
+    club = db.scalar(
+        select(Club).where(
+            Club.id == club_id,
+            Club.is_active.is_(True),
+        ).with_for_update()
+    )
+    if club is None:
+        raise HTTPException(status_code=404, detail="Club not found")
+
+    candidate = db.get(User, data.student_id)
+    if (
+        candidate is None
+        or not candidate.is_active
+        or candidate.account_type != AccountType.STUDENT
+    ):
+        raise HTTPException(
+            status_code=422, detail="Target must be an active Student account"
+        )
+
+    existing = db.scalar(
+        select(ClubAdministrator).where(ClubAdministrator.club_id == club.id)
+    )
+    if existing is not None and existing.user_id == candidate.id:
+        db.commit()  # release the club lock without making another grant
+        return ClubAdministratorAssignmentResponse(
+            club_id=club.id, user_id=candidate.id
+        )
+
+    # DELETE executes before INSERT. The two operations share one transaction;
+    # on failure, the previous administrator remains unchanged.
+    if existing is not None:
+        db.execute(
+            delete(ClubAdministrator).where(
+                ClubAdministrator.club_id == club.id
+            )
+        )
+    db.add(ClubAdministrator(club_id=club.id, user_id=candidate.id))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Administrator assignment conflict; retry"
+        ) from None
+    return ClubAdministratorAssignmentResponse(
+        club_id=club.id, user_id=candidate.id
+    )

@@ -104,3 +104,15 @@ class ManagedClub(BaseModel):
 
 class ManagedClubsResponse(BaseModel):
     clubs: list[ManagedClub]
+
+
+class ClubAdministratorAssignment(BaseModel):
+    """Only an existing Student's ID is accepted. No role field is allowed."""
+
+    model_config = ConfigDict(extra="forbid")
+    student_id: UUID
+
+
+class ClubAdministratorAssignmentResponse(BaseModel):
+    club_id: UUID
+    user_id: UUID
