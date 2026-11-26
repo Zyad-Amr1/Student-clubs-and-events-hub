@@ -38,7 +38,7 @@ The measured modules have 100% statement and branch coverage.
 
 ## Hosted CI
 
-[GitHub Actions — all checks passed](https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872155571)
+[GitHub Actions — all checks passed](https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872485198)
 
 - 21 Lab 6 tests passed; coverage 100%.
 - 11 Lab 7 tests passed.
