@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="390" viewBox="0 0 1150 390">
+<rect width="1150" height="390" rx="18" fill="#121823"/>
+<rect x="20" y="18" width="1110" height="354" rx="18" fill="#1c2432" stroke="#4c5b70" stroke-width="2"/>
+<text x="48" y="54" fill="#e1e8f2" font-family="monospace" font-size="22">Coverage.py — Lab 6 A1</text>
+<text x="48" y="88" fill="#7dbfff" font-family="monospace" font-size="16">$ coverage run --branch --source=fees,grades -m pytest -q</text>
+<text x="48" y="122" fill="#82dca0" font-family="monospace" font-size="16">21 passed</text>
+<text x="48" y="156" fill="#7dbfff" font-family="monospace" font-size="16">$ coverage report -m</text>
+<text x="48" y="190" fill="#e1e8f2" font-family="monospace" font-size="16">Name        Stmts   Miss Branch BrPart  Cover   Missing</text>
+<text x="48" y="224" fill="#e1e8f2" font-family="monospace" font-size="16">-------------------------------------------------------</text>
+<text x="48" y="258" fill="#82dca0" font-family="monospace" font-size="16">fees.py        32      0     10      0   100%</text>
+<text x="48" y="292" fill="#82dca0" font-family="monospace" font-size="16">grades.py      10      0      6      0   100%</text>
+<text x="48" y="326" fill="#82dca0" font-family="monospace" font-size="16">TOTAL          42      0     16      0   100%</text>
+<text x="48" y="360" fill="#82dca0" font-family="monospace" font-size="16">Statement coverage: 100%  |  Branch coverage: 100%</text>
+</svg>
