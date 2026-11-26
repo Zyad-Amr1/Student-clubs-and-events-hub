@@ -17,7 +17,7 @@
 
 ## Hosted GitHub Actions — all checks passed
 
-Workflow: [Lab 6 Assignment Checks](https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872155571)
+Workflow: [Lab 6 Assignment Checks](https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872485198)
 
 - Lab 6 unit tests: **21 passed**.
 - Branch coverage gate: **100%**.
