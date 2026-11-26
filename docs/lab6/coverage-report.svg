@@ -8,7 +8,7 @@
 <text x="48" y="190" fill="#e1e8f2" font-family="monospace" font-size="16">Name        Stmts   Miss Branch BrPart  Cover   Missing</text>
 <text x="48" y="224" fill="#e1e8f2" font-family="monospace" font-size="16">-------------------------------------------------------</text>
 <text x="48" y="258" fill="#82dca0" font-family="monospace" font-size="16">fees.py        32      0     10      0   100%</text>
-<text x="48" y="292" fill="#82dca0" font-family="monospace" font-size="16">grades.py      12      0     10      0   100%</text>
-<text x="48" y="326" fill="#82dca0" font-family="monospace" font-size="16">TOTAL          44      0     20      0   100%</text>
+<text x="48" y="292" fill="#82dca0" font-family="monospace" font-size="16">grades.py      10      0      6      0   100%</text>
+<text x="48" y="326" fill="#82dca0" font-family="monospace" font-size="16">TOTAL          42      0     16      0   100%</text>
 <text x="48" y="360" fill="#82dca0" font-family="monospace" font-size="16">Statement coverage: 100%  |  Branch coverage: 100%</text>
 </svg>
