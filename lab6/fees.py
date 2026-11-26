@@ -20,18 +20,19 @@ class Course:
     hours: int
 
 
-def tuition_fee(courses, student_type, summer=False):
-    total = 0
+def _rate_for(student_type):
+    if student_type is StudentType.REGULAR:
+        return BASE_RATE
+    if student_type is StudentType.STAFF_CHILD:
+        return STAFF_CHILD_RATE
+    if student_type is StudentType.SCHOLARSHIP:
+        return 0
+    raise ValueError(f"Unsupported student type: {student_type!r}")
 
-    for course in courses:
-        if student_type is StudentType.REGULAR:
-            total += course.hours * BASE_RATE
-        elif student_type is StudentType.STAFF_CHILD:
-            total += course.hours * STAFF_CHILD_RATE
-        elif student_type is StudentType.SCHOLARSHIP:
-            total += 0
-        else:
-            raise ValueError(f"Unsupported student type: {student_type!r}")
+
+def tuition_fee(courses, student_type, summer=False):
+    rate = _rate_for(student_type)
+    total = sum(course.hours * rate for course in courses)
 
     if total > HIGH_FEE_THRESHOLD:
         total -= HIGH_FEE_REDUCTION
