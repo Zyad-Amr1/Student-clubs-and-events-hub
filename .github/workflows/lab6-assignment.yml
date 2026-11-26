@@ -12,7 +12,6 @@ on:
     paths:
       - "lab6/**"
       - "lab7/**"
-      - "docs/lab6/**"
       - ".github/workflows/lab6-assignment.yml"
 
 jobs:
