@@ -1,0 +1,1 @@
+100% statement and branch coverage means every measured executable statement and decision branch ran during the test suite, but it does not prove the software is defect-free.
