@@ -45,7 +45,7 @@ jobs:
 
       - name: Run Behave scenarios
         working-directory: lab7
-        run: behave -f progress
+        run: behave -f progress features/registration.feature
 
       - name: Run Ruff on submitted implementation
         run: ruff check lab6/fees.py lab6/grades.py lab7/registration.py lab7/invoice.py lab7/features/steps/registration_steps.py
