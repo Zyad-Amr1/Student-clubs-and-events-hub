@@ -1,5 +1,5 @@
 GitHub Actions run:
-https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872155571
+https://github.com/Zyad-Amr1/Student-clubs-and-events-hub/actions/runs/45872485198
 
 Command:
 behave -f progress features/registration.feature
